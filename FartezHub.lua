@@ -1,29 +1,28 @@
+-- Fartez Hub Loader
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
-local Games = require(script:WaitForChild("GameList"))
+local GameListURL = "https://raw.githubusercontent.com/fartez127-design/Fartezhubx2/refs/heads/main/GameList.lua"
 
-local HUB_NAME = "Fartez Hub"
+local success, Games = pcall(function()
+    return loadstring(game:HttpGet(GameListURL))()
+end)
 
-local function kickUnsupported()
-    if LocalPlayer then
-        LocalPlayer:Kick(HUB_NAME .. " does not support this game yet.")
-    end
-end
-
-local GameId = game.GameId
-local URL = Games[GameId]
-
-if not URL or URL == "" then
-    kickUnsupported()
+if not success or type(Games) ~= "table" then
+    LocalPlayer:Kick("❌ Failed to load Fartez Hub game list.")
     return
 end
 
-local ok, result = pcall(function()
-    return loadstring(game:HttpGet(URL))()
+local ScriptURL = Games[game.PlaceId]
+if not ScriptURL then
+    return
+end
+
+local loaded, err = pcall(function()
+    loadstring(game:HttpGet(ScriptURL))()
 end)
 
-if not ok then
-    warn("Failed to load supported game script:", result)
-    kickUnsupported()
+if not loaded then
+    LocalPlayer:Kick("❌ Failed to load script:\n" .. tostring(err))
 end
