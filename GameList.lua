@@ -14,14 +14,4 @@ local Games = {
     [10045085816] = "https://raw.githubusercontent.com/fartez127-design/FARTEZHUB/refs/heads/main/FARTEZHUBXBuildBridgetoBrainrots",
 }
 
-local GameId = game.PlaceId
-local ScriptURL = Games[GameId]
-
-if not ScriptURL then
-    game.Players.LocalPlayer:Kick(
-        "❌ This game is not supported by Fartez Hub.\n\nJoin a supported game to continue."
-    )
-    return
-end
-
-return ScriptURL
+return Games
