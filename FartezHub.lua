@@ -3,7 +3,13 @@ local Games = loadstring(game:HttpGet("https://raw.githubusercontent.com/fartez1
 local URL = Games[game.PlaceId]
 
 if URL then
-    loadstring(game:HttpGet(URL))()
+    local success, err = pcall(function()
+        loadstring(game:HttpGet(URL))()
+    end)
+
+    if not success then
+        warn("Script Load Error:", err)
+    end
 else
-    game.Players.LocalPlayer:Kick("Unsupported Game")
+    warn("FARTEZ HUB : Unsupported Game")
 end
