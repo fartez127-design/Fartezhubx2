@@ -1,3 +1,6 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
 local Games = {
     [9452898647]  = "https://raw.githubusercontent.com/fartez127-design/FARTEZHUB/refs/heads/main/Farte01",
     [9491545867]  = "https://raw.githubusercontent.com/fartez127-design/FARTEZHUB/refs/heads/main/FARTEZ%20HUB%20X%20Break%20a%20Brainrot%20Egg",
