@@ -1,0 +1,1459 @@
+-- [[ 1. SETUP & CORE VARIABLES ]] --
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local VirtualUser = game:GetService("VirtualUser")
+
+local player = Players.LocalPlayer
+local PlayerGui = player:WaitForChild("PlayerGui")
+local SafeParent = (pcall(function() return gethui() end) and gethui()) or PlayerGui
+
+-- ลบ UI เก่าทิ้ง (กันโหลดซ้อน)
+if SafeParent:FindFirstChild("FARTEZ_LUCKY_HUB") then 
+    SafeParent.FARTEZ_LUCKY_HUB:Destroy() 
+end
+
+-- [[ THEME SETUP ]] --
+local Theme = {
+    Background = Color3.fromRGB(5, 5, 8),
+    Surface = Color3.fromRGB(15, 15, 20),
+    SurfaceLight = Color3.fromRGB(25, 25, 35),
+    Accent = Color3.fromRGB(4, 203, 41),
+    Text = Color3.fromRGB(255, 255, 255),
+    TextDim = Color3.fromRGB(150, 150, 150),
+    Gold = Color3.fromRGB(255, 215, 0),      
+    Success = Color3.fromRGB(4, 203, 41)     
+}
+
+-- [[ 2. UI CREATION ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "FARTEZ_LUCKY_HUB"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 9999
+ScreenGui.Parent = SafeParent
+
+local toggleBtn = Instance.new("ImageButton", ScreenGui)
+toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+toggleBtn.Position = UDim2.new(0, 15, 0, 150)
+toggleBtn.BackgroundColor3 = Theme.Surface
+toggleBtn.Image = "rbxthumb://type=Asset&id=117149073945265&w=150&h=150"
+toggleBtn.Active = true
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0.5, 0)
+
+local btnStroke = Instance.new("UIStroke", toggleBtn)
+btnStroke.Thickness = 2
+btnStroke.Color = Theme.Accent
+
+-- ระบบลากปุ่มแบบกำหนดเอง
+local draggingToggle, dragInputToggle, dragStartToggle, startPosToggle
+toggleBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingToggle = true
+        dragStartToggle = input.Position
+        startPosToggle = toggleBtn.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                draggingToggle = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if draggingToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStartToggle
+        toggleBtn.Position = UDim2.new(startPosToggle.X.Scale, startPosToggle.X.Offset + delta.X, startPosToggle.Y.Scale, startPosToggle.Y.Offset + delta.Y)
+    end
+end)
+
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 290, 0, 420)
+Main.Position = UDim2.new(0.5, -170, 0.5, -240)
+Main.BackgroundColor3 = Theme.Background
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+
+local BgImage = Instance.new("ImageLabel", Main)
+BgImage.Size = UDim2.new(1, 0, 1, 0)
+BgImage.BackgroundTransparency = 1
+BgImage.Image = "rbxassetid://10734950059"
+BgImage.ImageColor3 = Color3.fromRGB(50, 40, 10)
+BgImage.ImageTransparency = 0.85
+BgImage.ScaleType = Enum.ScaleType.Crop
+BgImage.ZIndex = 0
+
+-- เอฟเฟกต์ฝนตก
+local RainContainer = Instance.new("Frame", Main)
+RainContainer.Size = UDim2.new(1, 0, 1, 0)
+RainContainer.BackgroundTransparency = 1
+RainContainer.ZIndex = 1
+
+local RainDrops = {}
+for i = 1, 15 do
+    local drop = Instance.new("Frame", RainContainer)
+    drop.Size = UDim2.new(0, 1, 0, math.random(10, 25))
+    drop.Position = UDim2.new(math.random(), 0, -0.1, 0)
+    drop.BackgroundColor3 = Theme.Accent 
+    drop.BackgroundTransparency = 0.7
+    drop.BorderSizePixel = 0
+    drop.ZIndex = 2
+    table.insert(RainDrops, {Object = drop, Speed = math.random(15, 35) / 100})
+end
+
+RunService.RenderStepped:Connect(function()
+    for _, drop in pairs(RainDrops) do
+        local cp = drop.Object.Position
+        drop.Object.Position = UDim2.new(cp.X.Scale, 0, cp.Y.Scale + drop.Speed, 0)
+        if drop.Object.Position.Y.Scale > 1.1 then
+            drop.Object.Position = UDim2.new(math.random(), 0, -0.1, 0)
+        end
+    end
+end)
+
+local TopBar = Instance.new("Frame", Main)
+TopBar.Size = UDim2.new(1, 0, 0, 50)
+TopBar.BackgroundColor3 = Theme.Surface
+TopBar.BorderSizePixel = 0
+TopBar.ZIndex = 10
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 12)
+
+local Logo = Instance.new("ImageLabel", TopBar)
+Logo.Size = UDim2.new(0, 36, 0, 36)
+Logo.Position = UDim2.new(0, 10, 0.5, -18)
+Logo.BackgroundTransparency = 1
+Logo.Image = "rbxthumb://type=Asset&id=117149073945265&w=150&h=150"
+Logo.ScaleType = Enum.ScaleType.Fit
+Logo.ZIndex = 11
+Instance.new("UICorner", Logo).CornerRadius = UDim.new(0.2, 0)
+
+local Title = Instance.new("TextLabel") 
+Title.Size = UDim2.new(0, 160, 0, 22) 
+Title.Position = UDim2.new(0, 52, 0, 5) 
+Title.BackgroundTransparency = 1 
+Title.Text = "FARTEZ HUB" 
+Title.TextColor3 = Theme.Text 
+Title.TextSize = 18 
+Title.Font = Enum.Font.GothamBold 
+Title.TextXAlignment = Enum.TextXAlignment.Left 
+Title.ZIndex = 11 
+Title.Parent = TopBar
+
+local Subtitle = Instance.new("TextLabel") 
+Subtitle.Size = UDim2.new(0, 200, 0, 16) 
+Subtitle.Position = UDim2.new(0, 52, 0, 26) 
+Subtitle.BackgroundTransparency = 1 
+Subtitle.Text = "Break and Steal an Egg" 
+Subtitle.TextColor3 = Theme.Accent 
+Subtitle.TextSize = 10 
+Subtitle.Font = Enum.Font.GothamSemibold 
+Subtitle.TextXAlignment = Enum.TextXAlignment.Left 
+Subtitle.ZIndex = 11 
+Subtitle.Parent = TopBar
+
+local TabContainer = Instance.new("Frame", Main)
+TabContainer.Size = UDim2.new(1, -16, 0, 36)
+TabContainer.Position = UDim2.new(0, 8, 0, 58)
+TabContainer.BackgroundColor3 = Theme.Surface
+TabContainer.ZIndex = 10
+Instance.new("UICorner", TabContainer).CornerRadius = UDim.new(0, 8)
+
+local TabLayout = Instance.new("UIListLayout", TabContainer)
+TabLayout.FillDirection = Enum.FillDirection.Horizontal
+TabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+TabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+TabLayout.Padding = UDim.new(0, 4)
+
+local Content = Instance.new("Frame", Main)
+Content.Size = UDim2.new(1, -16, 1, -110)
+Content.Position = UDim2.new(0, 8, 0, 102)
+Content.BackgroundTransparency = 1
+Content.ClipsDescendants = false
+Content.ZIndex = 5
+
+local Tabs = {}
+local function CreateTab(name)
+    local Btn = Instance.new("TextButton", TabContainer)
+    Btn.Size = UDim2.new(0, 52, 0, 28) 
+    Btn.BackgroundColor3 = Theme.SurfaceLight
+    Btn.Text = name
+    Btn.TextColor3 = Theme.TextDim
+    Btn.TextSize = 10 
+    Btn.Font = Enum.Font.GothamBold
+    Btn.ZIndex = 11
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+
+    local Page = Instance.new("ScrollingFrame", Content)
+    Page.Name = name .. "Page"
+    Page.Size = UDim2.new(1, 0, 1, 0)
+    Page.BackgroundTransparency = 1
+    Page.ScrollBarThickness = 2
+    Page.ScrollBarImageColor3 = Theme.Accent
+    Page.Visible = false
+    Page.ZIndex = 6
+    Page.ClipsDescendants = false
+
+    local PL = Instance.new("UIListLayout", Page)
+    PL.Padding = UDim.new(0, 10)
+    PL.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    
+    local PP = Instance.new("UIPadding", Page)
+    PP.PaddingTop = UDim.new(0, 6)
+    PP.PaddingBottom = UDim.new(0, 20)
+
+    table.insert(Tabs, {Btn = Btn, Page = Page})
+
+    Btn.MouseButton1Click:Connect(function()
+        for _, t in pairs(Tabs) do
+            t.Page.Visible = false
+            TweenService:Create(t.Btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.SurfaceLight, TextColor3 = Theme.TextDim}):Play()
+        end
+        Page.Visible = true
+        TweenService:Create(Btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.new(0,0,0)}):Play()
+    end)
+    return Page
+end
+
+local EventTab = CreateTab("Event")
+local MainTab = CreateTab("Main")
+local ZoneTab = CreateTab("Zone")
+local PlayerTab = CreateTab("Player")
+local DetailsTab = CreateTab("Details")
+
+local function CreateToggle(parent, text, callback)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(1, -20, 0, 36)
+    btn.BackgroundColor3 = Theme.SurfaceLight
+    btn.Text = "  " .. text .. ": OFF"
+    btn.TextColor3 = Theme.TextDim
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamBold
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.ZIndex = 7
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    local enabled = false
+    btn.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        if enabled then
+            btn.Text = "  " .. text .. ": ON"
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.new(0,0,0)}):Play()
+        else
+            btn.Text = "  " .. text .. ": OFF"
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Theme.SurfaceLight, TextColor3 = Theme.TextDim}):Play()
+        end
+        callback(enabled)
+    end)
+end
+
+local function CreateSlider(parent, title, min, max, default, callback)
+    local container = Instance.new("Frame", parent)
+    container.Size = UDim2.new(1, -20, 0, 50)
+    container.BackgroundTransparency = 1
+    container.ZIndex = 20
+
+    local label = Instance.new("TextLabel", container)
+    label.Size = UDim2.new(1, 0, 0, 18)
+    label.BackgroundTransparency = 1
+    label.Text = "  " .. title .. ": " .. default
+    label.TextColor3 = Theme.Text
+    label.TextSize = 11
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 20
+
+    local sliderBar = Instance.new("TextButton", container)
+    sliderBar.Size = UDim2.new(1, 0, 0, 24)
+    sliderBar.Position = UDim2.new(0, 0, 0, 20)
+    sliderBar.BackgroundColor3 = Theme.SurfaceLight
+    sliderBar.Text = ""
+    sliderBar.AutoButtonColor = false
+    sliderBar.ZIndex = 21
+    Instance.new("UICorner", sliderBar).CornerRadius = UDim.new(0, 6)
+
+    local fill = Instance.new("Frame", sliderBar)
+    fill.Size = UDim2.new((default - min)/(max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Theme.Accent
+    fill.BorderSizePixel = 0
+    fill.ZIndex = 22
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 6)
+
+    local value = default
+    local dragging = false
+
+    local function update(input)
+        local pos = UDim2.new(math.clamp((input.Position.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X, 0, 1), 0, 1, 0)
+        fill.Size = UDim2.new(pos.X.Scale, 0, 1, 0)
+        value = math.floor(min + (max - min) * pos.X.Scale)
+        label.Text = "  " .. title .. ": " .. value
+        callback(value)
+    end
+
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            update(input)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            update(input)
+        end
+    end)
+
+    return {
+        GetValue = function() return value end
+    }
+end
+
+local function CreateDropdown(parent, title, getItemsFunc, callback, defaultItem)
+    local isOpen = false
+    local items = getItemsFunc()
+    local selectedItem = defaultItem or items[1] or "None"
+
+    local container = Instance.new("Frame", parent)
+    container.Size = UDim2.new(1, -20, 0, 58)
+    container.BackgroundTransparency = 1
+    container.ZIndex = 20
+
+    local label = Instance.new("TextLabel", container)
+    label.Size = UDim2.new(1, 0, 0, 18)
+    label.BackgroundTransparency = 1
+    label.Text = "  " .. title
+    label.TextColor3 = Theme.Text
+    label.TextSize = 11
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 20
+
+    local dropdownBtn = Instance.new("TextButton", container)
+    dropdownBtn.Size = UDim2.new(1, 0, 0, 34)
+    dropdownBtn.Position = UDim2.new(0, 0, 0, 20)
+    dropdownBtn.BackgroundColor3 = Theme.SurfaceLight
+    dropdownBtn.Text = "  " .. title .. ": " .. selectedItem
+    dropdownBtn.TextColor3 = Theme.Accent
+    dropdownBtn.TextSize = 11
+    dropdownBtn.Font = Enum.Font.GothamSemibold
+    dropdownBtn.TextXAlignment = Enum.TextXAlignment.Left
+    dropdownBtn.ZIndex = 21
+    Instance.new("UICorner", dropdownBtn).CornerRadius = UDim.new(0, 6)
+
+    local arrow = Instance.new("TextLabel", dropdownBtn)
+    arrow.Size = UDim2.new(0, 30, 1, 0)
+    arrow.Position = UDim2.new(1, -30, 0, 0)
+    arrow.BackgroundTransparency = 1
+    arrow.Text = "▼"
+    arrow.TextColor3 = Theme.TextDim
+    arrow.TextSize = 10
+    arrow.Font = Enum.Font.GothamBold
+    arrow.ZIndex = 22
+
+    local listScroll = Instance.new("ScrollingFrame", container)
+    listScroll.Size = UDim2.new(1, 0, 0, 140)
+    listScroll.Position = UDim2.new(0, 0, 0, 56)
+    listScroll.BackgroundColor3 = Theme.Surface
+    listScroll.BorderSizePixel = 1
+    listScroll.BorderColor3 = Theme.SurfaceLight
+    listScroll.ScrollBarThickness = 3
+    listScroll.ScrollBarImageColor3 = Theme.Accent
+    listScroll.Visible = false
+    listScroll.ZIndex = 30
+    listScroll.ClipsDescendants = true
+    Instance.new("UICorner", listScroll).CornerRadius = UDim.new(0, 6)
+
+    local listLayout = Instance.new("UIListLayout", listScroll)
+    listLayout.Padding = UDim.new(0, 2)
+
+    local function RefreshDropdownItems()
+        items = getItemsFunc()
+        for _, child in ipairs(listScroll:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+
+        for _, itemName in ipairs(items) do
+            local itemBtn = Instance.new("TextButton", listScroll)
+            itemBtn.Size = UDim2.new(1, 0, 0, 28)
+            itemBtn.BackgroundColor3 = Theme.Surface
+            itemBtn.Text = "   " .. itemName
+            itemBtn.TextColor3 = Theme.Text
+            itemBtn.TextSize = 11
+            itemBtn.Font = Enum.Font.Gotham
+            itemBtn.TextXAlignment = Enum.TextXAlignment.Left
+            itemBtn.ZIndex = 31
+
+            itemBtn.MouseButton1Click:Connect(function()
+                selectedItem = itemName
+                dropdownBtn.Text = "  " .. title .. ": " .. itemName
+                dropdownBtn.TextColor3 = Theme.Accent
+                isOpen = false
+                listScroll.Visible = false
+                arrow.Text = "▼"
+                callback(selectedItem)
+            end)
+        end
+
+        task.wait()
+        listScroll.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 5)
+    end
+
+    dropdownBtn.MouseButton1Click:Connect(function()
+        isOpen = not isOpen
+        if isOpen then
+            RefreshDropdownItems()
+        end
+        listScroll.Visible = isOpen
+        arrow.Text = isOpen and "▲" or "▼"
+    end)
+    
+    callback(selectedItem)
+    return {
+        GetSelected = function() return selectedItem end,
+        Refresh = RefreshDropdownItems
+    }
+end
+
+local function CreateMultiSelectDropdown(parent, title, getItemsFunc, callback)
+    local isOpen = false
+    local items = getItemsFunc()
+    local selectedItems = {}
+
+    local container = Instance.new("Frame", parent)
+    container.Size = UDim2.new(1, -20, 0, 58)
+    container.BackgroundTransparency = 1
+    container.ZIndex = 20
+
+    local label = Instance.new("TextLabel", container)
+    label.Size = UDim2.new(1, 0, 0, 18)
+    label.BackgroundTransparency = 1
+    label.Text = "  " .. title
+    label.TextColor3 = Theme.Text
+    label.TextSize = 11
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.ZIndex = 20
+
+    local dropdownBtn = Instance.new("TextButton", container)
+    dropdownBtn.Size = UDim2.new(1, 0, 0, 34)
+    dropdownBtn.Position = UDim2.new(0, 0, 0, 20)
+    dropdownBtn.BackgroundColor3 = Theme.SurfaceLight
+    dropdownBtn.Text = "  " .. title .. ": None Selected"
+    dropdownBtn.TextColor3 = Theme.Accent
+    dropdownBtn.TextSize = 11
+    dropdownBtn.Font = Enum.Font.GothamSemibold
+    dropdownBtn.TextXAlignment = Enum.TextXAlignment.Left
+    dropdownBtn.ZIndex = 21
+    Instance.new("UICorner", dropdownBtn).CornerRadius = UDim.new(0, 6)
+
+    local arrow = Instance.new("TextLabel", dropdownBtn)
+    arrow.Size = UDim2.new(0, 30, 1, 0)
+    arrow.Position = UDim2.new(1, -30, 0, 0)
+    arrow.BackgroundTransparency = 1
+    arrow.Text = "▼"
+    arrow.TextColor3 = Theme.TextDim
+    arrow.TextSize = 10
+    arrow.Font = Enum.Font.GothamBold
+    arrow.ZIndex = 22
+
+    local listScroll = Instance.new("ScrollingFrame", container)
+    listScroll.Size = UDim2.new(1, 0, 0, 150)
+    listScroll.Position = UDim2.new(0, 0, 0, 56)
+    listScroll.BackgroundColor3 = Theme.Surface
+    listScroll.BorderSizePixel = 1
+    listScroll.BorderColor3 = Theme.SurfaceLight
+    listScroll.ScrollBarThickness = 3
+    listScroll.ScrollBarImageColor3 = Theme.Accent
+    listScroll.Visible = false
+    listScroll.ZIndex = 30
+    listScroll.ClipsDescendants = true
+    Instance.new("UICorner", listScroll).CornerRadius = UDim.new(0, 6)
+
+    local listLayout = Instance.new("UIListLayout", listScroll)
+    listLayout.Padding = UDim.new(0, 2)
+
+    local function UpdateButtonText()
+        local count = 0
+        local names = {}
+        for k, v in pairs(selectedItems) do
+            if v then
+                count = count + 1
+                table.insert(names, k)
+            end
+        end
+        if count == 0 then
+            dropdownBtn.Text = "  " .. title .. ": None Selected"
+        else
+            dropdownBtn.Text = "  " .. title .. ": " .. table.concat(names, ", ")
+        end
+    end
+
+    local function RefreshItems()
+        items = getItemsFunc()
+        for _, child in ipairs(listScroll:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+
+        for _, itemName in ipairs(items) do
+            local itemBtn = Instance.new("TextButton", listScroll)
+            itemBtn.Size = UDim2.new(1, 0, 0, 28)
+            itemBtn.BackgroundColor3 = Theme.Surface
+            local isSel = selectedItems[itemName] or false
+            itemBtn.Text = "   " .. itemName .. (isSel and " [ON]" or " [OFF]")
+            itemBtn.TextColor3 = isSel and Theme.Accent or Theme.Text
+            itemBtn.TextSize = 11
+            itemBtn.Font = Enum.Font.Gotham
+            itemBtn.TextXAlignment = Enum.TextXAlignment.Left
+            itemBtn.ZIndex = 31
+            Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(0, 4)
+
+            itemBtn.MouseButton1Click:Connect(function()
+                selectedItems[itemName] = not (selectedItems[itemName] or false)
+                local currentSel = selectedItems[itemName]
+                itemBtn.Text = "   " .. itemName .. (currentSel and " [ON]" or " [OFF]")
+                itemBtn.TextColor3 = currentSel and Theme.Accent or Theme.Text
+                UpdateButtonText()
+                callback(selectedItems)
+            end)
+        end
+
+        task.wait()
+        listScroll.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 5)
+    end
+
+    dropdownBtn.MouseButton1Click:Connect(function()
+        isOpen = not isOpen
+        if isOpen then
+            RefreshItems()
+        end
+        listScroll.Visible = isOpen
+        arrow.Text = isOpen and "▲" or "▼"
+    end)
+
+    RefreshItems()
+    return {
+        GetSelected = function() return selectedItems end,
+        Refresh = RefreshItems
+    }
+end
+
+-- ================= [ SHARED FUNCTIONS & MASTER DASH SPEED ] ================= --
+local globalDashSpeed = 200
+
+CreateSlider(MainTab, "Master Dash Speed", 1, 1000, 200, function(val)
+    globalDashSpeed = val
+end)
+
+-- ================= [ ANTI AFK SYSTEM ] ================= --
+local antiAfkConnection = nil
+CreateToggle(MainTab, "Anti AFK", function(state)
+    if state then
+        antiAfkConnection = player.Idled:Connect(function()
+            VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        end)
+    else
+        if antiAfkConnection then
+            antiAfkConnection:Disconnect()
+            antiAfkConnection = nil
+        end
+    end
+end)
+
+local function GetZoneList()
+    local zones = {}
+    local animals = ReplicatedStorage:FindFirstChild("Animals")
+    local normal = animals and animals:FindFirstChild("Normal")
+    if not normal then return zones end
+    for i = 1, 9 do
+        local zone = normal:FindFirstChild("Zone_" .. i)
+        if zone then
+            table.insert(zones, "Zone " .. i)
+        end
+    end
+    return zones
+end
+
+local function GetCharacter()
+    local char = player.Character
+    if not char then return nil, nil, nil end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local rootPart = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not rootPart then return nil, nil, nil end
+    return char, humanoid, rootPart
+end
+
+local function GetObjectPosition(object)
+    if not object then return nil end
+    if object:IsA("BasePart") then return object.Position end
+    if object:IsA("Model") then
+        if object.PrimaryPart then return object.PrimaryPart.Position end
+        local hrp = object:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp:IsA("BasePart") then return hrp.Position end
+        local part = object:FindFirstChildWhichIsA("BasePart")
+        if part then return part.Position end
+    end
+    return nil
+end
+
+local function PerformDash(rootPart, targetPos)
+    local horizontalTarget = Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z)
+    local distance = (Vector3.new(rootPart.Position.X, 0, rootPart.Position.Z) - Vector3.new(horizontalTarget.X, 0, horizontalTarget.Z)).Magnitude
+    
+    if distance > 4 then
+        local offset = Vector3.new(
+            horizontalTarget.X - rootPart.Position.X,
+            0,
+            horizontalTarget.Z - rootPart.Position.Z
+        )
+        
+        if offset.Magnitude > 0.01 then
+            local direction = offset.Unit
+            local dashSpeed = 40 + ((globalDashSpeed - 1) / 999) * (1200 - 40)
+            
+            rootPart.CFrame = CFrame.lookAt(
+                rootPart.Position,
+                rootPart.Position + direction
+            )
+            
+            rootPart.AssemblyLinearVelocity = Vector3.new(
+                direction.X * dashSpeed,
+                0, 
+                direction.Z * dashSpeed
+            )
+        end
+        return false
+    else
+        rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+        return true
+    end
+end
+
+-- ================= [ OPTIMIZED NO DELAY STEAL ] ================= --
+_G.InstantPrompt = false
+ProximityPromptService.PromptShown:Connect(function(prompt)
+    if _G.InstantPrompt then
+        prompt.HoldDuration = 0
+        prompt.MaxActivationDistance = 9999
+        prompt.RequiresLineOfSight = false
+    end
+end)
+
+CreateToggle(MainTab, "No Delay Steal", function(state)
+    _G.InstantPrompt = state
+end)
+
+CreateToggle(MainTab, "Boost FPS (Remove Decors)", function(state)
+    if state then
+        task.spawn(function()
+            for i = 1, 9 do
+                pcall(function()
+                    local zoneDecor = workspace.Build.ZoneBuilds["Zone" .. i]:FindFirstChild("Decor")
+                    if zoneDecor then zoneDecor:Destroy() end
+                end)
+            end
+        end)
+    end
+end)
+
+CreateToggle(MainTab, "Boost FPS (Event)", function(state)
+    if state then
+        task.spawn(function()
+            pcall(function()
+                local decor = workspace.HellBossFight.Build.Decor
+                if decor then decor:Destroy() end
+            end)
+            pcall(function()
+                local vfx = workspace.HellBossFight.Build.Vfx
+                if vfx then vfx:Destroy() end
+            end)
+        end)
+    end
+end)
+
+-- ================= [ FIXED GOD MODE ] ================= --
+local godModeConnection = nil
+CreateToggle(MainTab, "God Mode", function(state)
+    if state then
+        godModeConnection = RunService.Heartbeat:Connect(function()
+            local char = player.Character
+            if char then
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                local rootPart = char:FindFirstChild("HumanoidRootPart")
+                if humanoid then
+                    if humanoid.Health < humanoid.MaxHealth then humanoid.Health = humanoid.MaxHealth end
+                    pcall(function()
+                        humanoid:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+                        humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+                        humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
+                        humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+                    end)
+                end
+                if rootPart then
+                    local vel = rootPart.AssemblyLinearVelocity
+                    if math.abs(vel.X) > 400 or math.abs(vel.Z) > 400 or vel.Y < -300 then
+                        rootPart.AssemblyLinearVelocity = Vector3.new(0, vel.Y > -300 and vel.Y or 0, 0)
+                    end
+                end
+            end
+        end)
+    else
+        if godModeConnection then
+            godModeConnection:Disconnect()
+            godModeConnection = nil
+        end
+    end
+end)
+
+-- ================= [ ZONE RARITY DATA & NO-LAG AUTO STEAL ] ================= --
+local ZoneRarityData = {
+    ["Zone 1"] = {
+        ["Chicken"] = "Common", ["Cat"] = "Common",
+        ["Bat"] = "Uncommon", ["Anteater"] = "Uncommon",
+        ["Badger"] = "Rare", ["Parrot"] = "Rare",
+        ["Golden Retriever"] = "Epic", ["Bear"] = "Legendary"
+    },
+    ["Zone 2"] = {
+        ["Snake"] = "Common",
+        ["Tiger"] = "Uncommon", ["Lion"] = "Uncommon",
+        ["Ankylosaurus"] = "Rare", ["Cockatrice"] = "Rare",
+        ["Sphinx"] = "Epic", ["CHIREMA"] = "Legendary"
+    },
+    ["Zone 3"] = {
+        ["Pigeon"] = "Uncommon", ["Guinea Pig"] = "Uncommon",
+        ["Maltese"] = "Rare", ["Goat"] = "Rare",
+        ["Bichon Frise"] = "Epic", ["Secretary Bird"] = "Legendary",
+        ["Llama"] = "Mythic", ["Manticore"] = "Mythic",
+        ["Polar Bear"] = "Divine"
+    },
+    ["Zone 4"] = {
+        ["Bunny"] = "Uncommon",
+        ["Trumpet"] = "Rare", ["Muscovy Duck"] = "Rare",
+        ["Barracuda"] = "Epic", ["Moorish Idol"] = "Legendary",
+        ["Yak"] = "Mythic", ["Cobra"] = "Divine",
+        ["Prehistoric Dragonfly"] = "Cosmic"
+    },
+    ["Zone 5"] = {
+        ["Snail"] = "Rare", ["Goldfish"] = "Rare",
+        ["Lizard"] = "Epic", ["Pufferfish"] = "Legendary",
+        ["Butterfly Fish"] = "Mythic", ["Stingray"] = "Divine",
+        ["Regal"] = "Cosmic", ["Prehistoric Moth"] = "Secret"
+    },
+    ["Zone 6"] = {
+        ["Cuttlefish"] = "Rare",
+        ["Fangtooth Fish"] = "Epic",
+        ["Swordfish"] = "Legendary",
+        ["Mantis Shrimp"] = "Mythic",
+        ["Goblin Shark"] = "Divine",
+        ["Leafy Sea Dragon"] = "Cosmic",
+        ["Megalodon"] = "Secret",
+        ["Amphiptere"] = "Celestial"
+    },
+    ["Zone 7"] = {
+        ["Jackalope"] = "Epic",
+        ["DIMETRODON"] = "Legendary",
+        ["Brachiosaurus"] = "Mythic",
+        ["Lindworm"] = "Divine",
+        ["T-Rex"] = "Cosmic",
+        ["Fenrir"] = "Secret",
+        ["Cerberus"] = "Celestial", ["Raiju"] = "Celestial"
+    },
+    ["Zone 8"] = {
+        ["Tanuki"] = "Legendary",
+        ["Surgeon Fish"] = "Mythic",
+        ["Mandarin Fish"] = "Divine",
+        ["Dumbo Octopus"] = "Cosmic",
+        ["Akita"] = "Secret",
+        ["Gallimimus"] = "Celestial", ["Wolf"] = "Celestial", ["Simurgh"] = "Celestial"
+    },
+    ["Zone 9"] = {
+        ["Crocodile"] = "Mythic",
+        ["Whale"] = "Divine",
+        ["Zebra"] = "Cosmic",
+        ["Thunderbird"] = "Secret", ["Archaeopteryx"] = "Secret",
+        ["Winged Imp"] = "Celestial", ["Caladrius"] = "Celestial",
+        ["Velociraptor"] = "Inferno", ["Fire Dragon"] = "Inferno"
+    }
+}
+
+local RarityHierarchy = {
+    "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Divine", "Cosmic", "Secret", "Celestial", "Inferno"
+}
+
+local SelectedRarities = {}
+CreateMultiSelectDropdown(ZoneTab, "Select Rarities (Auto Steal)", function()
+    return RarityHierarchy
+end, function(sel)
+    SelectedRarities = sel
+end)
+
+local function GetAnimalPickups()
+    return workspace:FindFirstChild("AnimalPickups")
+end
+
+local function GetSafeZonePosition()
+    return Vector3.new(-70.68790435791016, 3.5075314044952393, 0.8315988779067993)
+end
+
+local function GetRarityByAnimalName(animalName)
+    if type(animalName) ~= "string" then return nil end
+    local searchName = string.lower(animalName:match("^%s*(.-)%s*$"))
+
+    for _, zoneMap in pairs(ZoneRarityData) do
+        for name, rarity in pairs(zoneMap) do
+            local normalizedName = string.lower(name:match("^%s*(.-)%s*$"))
+            if normalizedName == searchName then
+                return rarity
+            end
+        end
+    end
+    return nil
+end
+
+local function FindTargetAnimalByRarity()
+    local pickups = GetAnimalPickups()
+    if not pickups then return nil end
+
+    local anySelected = false
+    for _, s in pairs(SelectedRarities) do
+        if s then anySelected = true; break end
+    end
+    if not anySelected then return nil end
+
+    for _, obj in ipairs(pickups:GetChildren()) do
+        local animalRarity = GetRarityByAnimalName(obj.Name)
+        
+        if not animalRarity then
+            local nameVal = obj:FindFirstChild("AnimalName", true)
+            if nameVal and nameVal:IsA("StringValue") then
+                animalRarity = GetRarityByAnimalName(nameVal.Value)
+            end
+        end
+
+        if animalRarity and SelectedRarities[animalRarity] then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function TriggerStealAction(targetAnimal)
+    pcall(function()
+        if not targetAnimal then return end
+
+        local char, humanoid, rootPart = GetCharacter()
+        local animalPos = GetObjectPosition(targetAnimal)
+        
+        if rootPart and animalPos and (rootPart.Position - animalPos).Magnitude > 4 then
+            rootPart.CFrame = CFrame.new(animalPos + Vector3.new(0, 2, 0))
+        end
+
+        for _, desc in ipairs(targetAnimal:GetDescendants()) do
+            if desc:IsA("ProximityPrompt") then
+                desc.MaxActivationDistance = 999
+                desc.HoldDuration = 0
+                desc.RequiresLineOfSight = false
+                fireproximityprompt(desc)
+            end
+        end
+        
+        for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+            if remote:IsA("RemoteEvent") then
+                local rName = remote.Name:lower()
+                if rName:find("steal") or rName:find("pickup") or rName:find("animal") then
+                    pcall(function()
+                        remote:FireServer(targetAnimal)
+                    end)
+                end
+            end
+        end
+    end)
+end
+
+local isStealingInProgress = false
+local autoStealRunning = false
+
+-- ================= [ HIGH-PERFORMANCE ANIMALPICKUPS AUTO STEAL ] ================= --
+CreateToggle(ZoneTab, "Auto Steal Active", function(state)
+    autoStealRunning = state
+    if not state then
+        isStealingInProgress = false
+        local _, humanoid, rootPart = GetCharacter()
+        if rootPart then rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+        if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
+        return
+    end
+
+    task.spawn(function()
+        while autoStealRunning do
+            local char, humanoid, rootPart = GetCharacter()
+            if not char or not rootPart then
+                task.wait(0.2)
+                continue
+            end
+
+            local targetAnimal = FindTargetAnimalByRarity()
+            local pickups = GetAnimalPickups()
+            
+            if targetAnimal and pickups then
+                isStealingInProgress = true
+                
+                local targetPos = GetObjectPosition(targetAnimal)
+                if targetPos then
+                    local timeout = 0
+                    local reached = false
+                    
+                    while autoStealRunning and targetAnimal.Parent == pickups do
+                        local currPos = GetObjectPosition(targetAnimal)
+                        if not currPos then break end
+                        
+                        reached = PerformDash(rootPart, currPos)
+                        if reached then break end
+                        
+                        task.wait(0.02)
+                        timeout += 0.02
+                        if timeout > 8 then break end
+                    end
+                    
+                    if reached and targetAnimal.Parent == pickups then
+                        local stealTimer = 0
+                        while autoStealRunning and targetAnimal.Parent == pickups and stealTimer < 3 do
+                            TriggerStealAction(targetAnimal)
+                            task.wait(0.04)
+                            stealTimer += 0.04
+                        end
+                    end
+                    
+                    if targetAnimal.Parent ~= pickups then
+                        local safePos = GetSafeZonePosition()
+                        if safePos then
+                            local returnTimeout = 0
+                            
+                            pcall(function()
+                                for _, part in ipairs(char:GetChildren()) do
+                                    if part:IsA("BasePart") then part.CanCollide = false end
+                                end
+                                if humanoid then
+                                    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                                end
+                            end)
+
+                            while autoStealRunning do
+                                if targetAnimal.Parent == pickups then
+                                    break
+                                end
+
+                                local currentPos = rootPart.Position
+                                local flatCurrent = Vector3.new(currentPos.X, 0, currentPos.Z)
+                                local flatTarget = Vector3.new(safePos.X, 0, safePos.Z)
+                                local dist = (flatCurrent - flatTarget).Magnitude
+
+                                if dist <= 5 then break end
+
+                                local dir = (flatTarget - flatCurrent).Unit
+                                local dashSpeed = 40 + ((globalDashSpeed - 1) / 999) * (1200 - 40)
+                                
+                                rootPart.CFrame = CFrame.lookAt(currentPos, currentPos + dir)
+                                rootPart.AssemblyLinearVelocity = Vector3.new(dir.X * dashSpeed, 0, dir.Z * dashSpeed)
+
+                                task.wait(0.02)
+                                returnTimeout += 0.02
+                                if returnTimeout > 6 then break end
+                            end
+
+                            pcall(function()
+                                for _, part in ipairs(char:GetChildren()) do
+                                    if part:IsA("BasePart") then part.CanCollide = true end
+                                end
+                                if humanoid then
+                                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                                end
+                            end)
+                        end
+                    end
+                end
+                
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                isStealingInProgress = false
+            end
+            
+            task.wait(0.1)
+        end
+        
+        isStealingInProgress = false
+        local _, humanoid, rootPart = GetCharacter()
+        if rootPart then rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+        if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end
+    end)
+end)
+
+-- ================= [ COMBINED EVENT: AUTO HELL EVENT (OPTIMIZED) ] ================= --
+local uiCache = {
+    joinNow = false,
+    collectEssence = false,
+    demonKing = false
+}
+
+local lastUIScan = 0
+local UI_SCAN_INTERVAL = 0.5
+
+local function GetEventUIState()
+    if tick() - lastUIScan >= UI_SCAN_INTERVAL then
+        lastUIScan = tick()
+
+        local joinNow = false
+        local collectEssence = false
+        local demonKing = false
+
+        pcall(function()
+            for _, gui in ipairs(player.PlayerGui:GetChildren()) do
+                if gui:IsA("ScreenGui") and gui.Enabled then
+                    for _, child in ipairs(gui:GetChildren()) do
+                        if child:IsA("TextButton") or child:IsA("TextLabel") then
+                            if child.Visible then
+                                local text = child.Text:upper()
+                                if text:find("JOIN NOW", 1, true) then joinNow = true end
+                                if text:find("COLLECT ESSENCE", 1, true) then collectEssence = true end
+                                if text:find("DEMON KING", 1, true) then demonKing = true end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        uiCache.joinNow = joinNow
+        uiCache.collectEssence = collectEssence
+        uiCache.demonKing = demonKing
+    end
+
+    return uiCache
+end
+
+local autoHellEventRunning = false
+CreateToggle(EventTab, "Auto Hell Event (Join -> Eggs -> Boss)", function(state)
+    autoHellEventRunning = state
+    if not state then
+        local _, _, rootPart = GetCharacter()
+        if rootPart then rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+        return
+    end
+    
+    task.spawn(function()
+        while autoHellEventRunning do
+            local char, humanoid = GetCharacter()
+            if char and humanoid then
+                local backpack = player:FindFirstChild("Backpack")
+                local fightFolder = workspace:FindFirstChild("HellBossFight")
+                local eggsFolder = fightFolder and fightFolder:FindFirstChild("EssenceEggs")
+                local hasEggs = eggsFolder and #eggsFolder:GetChildren() > 0
+                local bossObj = fightFolder and fightFolder:FindFirstChild("DemonBoss")
+                
+                if backpack then
+                    if hasEggs then
+                        local pickaxe = backpack:FindFirstChild("Pickaxe") or backpack:FindFirstChild("Axe")
+                        if pickaxe and not char:FindFirstChild("Pickaxe") and not char:FindFirstChild("Axe") then
+                            pcall(function() humanoid:EquipTool(pickaxe) end)
+                        end
+                    elseif bossObj then
+                        local bat = backpack:FindFirstChild("Bat")
+                        if bat and not char:FindFirstChild("Bat") then
+                            pcall(function() humanoid:EquipTool(bat) end)
+                        end
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+    
+    task.spawn(function()
+        local hitEggsMemory = {}
+        
+        while autoHellEventRunning do
+            local char, humanoid, rootPart = GetCharacter()
+            if not char or not rootPart then
+                task.wait(0.1)
+                continue
+            end
+            
+            local uiState = GetEventUIState()
+            local hasJoinNow = uiState.joinNow
+            local hasCollectEssence = uiState.collectEssence
+            local hasDemonKing = uiState.demonKing
+            
+            local fightFolder = workspace:FindFirstChild("HellBossFight")
+            local eggsFolder = fightFolder and fightFolder:FindFirstChild("EssenceEggs")
+            local demonBoss = fightFolder and fightFolder:FindFirstChild("DemonBoss")
+            
+            if hasJoinNow and not fightFolder then
+                local buildFolder = workspace:FindFirstChild("Build")
+                local zoneBuilds = buildFolder and buildFolder:FindFirstChild("ZoneBuilds")
+                local zone7 = zoneBuilds and zoneBuilds:FindFirstChild("Zone7")
+                local joinHell = zone7 and zone7:FindFirstChild("JoinHell")
+                local joinPos = GetObjectPosition(joinHell)
+                
+                if joinPos then
+                    local dist = (rootPart.Position - joinPos).Magnitude
+                    if dist > 6 then
+                        PerformDash(rootPart, joinPos)
+                    else
+                        rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    end
+                else
+                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
+                
+            elseif eggsFolder and #eggsFolder:GetChildren() > 0 then
+                local activeEggs = {}
+                for _, egg in ipairs(eggsFolder:GetChildren()) do
+                    activeEggs[egg] = true
+                end
+                for egg in pairs(hitEggsMemory) do
+                    if not activeEggs[egg] then
+                        hitEggsMemory[egg] = nil
+                    end
+                end
+                
+                local closestEgg = nil
+                local closestEggPos = nil
+                local shortestDist = math.huge
+                
+                for _, egg in ipairs(eggsFolder:GetChildren()) do
+                    if not hitEggsMemory[egg] then
+                        local eggPos = GetObjectPosition(egg)
+                        if eggPos then
+                            local dist = (rootPart.Position - eggPos).Magnitude
+                            if dist < shortestDist then
+                                shortestDist = dist
+                                closestEgg = egg
+                                closestEggPos = eggPos
+                            end
+                        end
+                    end
+                end
+                
+                if closestEgg and closestEggPos then
+                    local reached = PerformDash(rootPart, closestEggPos)
+                    if reached and autoHellEventRunning and closestEgg.Parent then
+                        pcall(function()
+                            local eggTarget = closestEgg:FindFirstChild("Egg") or closestEgg
+                            local remote = ReplicatedStorage:FindFirstChild("EggHitRequest") 
+                                        or ReplicatedStorage:FindFirstChild("HitEgg") 
+                                        or ReplicatedStorage:FindFirstChild("HitEggRequest")
+                            if remote then
+                                remote:FireServer(eggTarget, 31)
+                            end
+                        end)
+                        hitEggsMemory[closestEgg] = true
+                    end
+                else
+                    hitEggsMemory = {}
+                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
+                
+            elseif (hasDemonKing or demonBoss) and demonBoss then
+                local bossPos = GetObjectPosition(demonBoss)
+                if bossPos then
+                    PerformDash(rootPart, bossPos)
+                else
+                    rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end
+                
+            else
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+            
+            task.wait(0.05)
+        end
+        
+        local _, _, rootPart = GetCharacter()
+        if rootPart then rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+    end)
+end)
+
+-- ================= [ HIT EGG ZONE (INDEPENDENT FUNCTION) ] ================= --
+local selectedZone = "Zone 1"
+local SelectedEggs = {}
+local eggDropdown = nil
+
+CreateDropdown(EventTab, "Select Zone (Eggs)", GetZoneList, function(zone)
+    selectedZone = zone
+    if eggDropdown then
+        eggDropdown.Refresh()
+    end
+end, "Zone 1")
+
+eggDropdown = CreateMultiSelectDropdown(EventTab, "Select Egg Targets", function()
+    local result = {}
+    local seen = {}
+    local buildFolder = workspace:FindFirstChild("Build")
+    local zoneBuilds = buildFolder and buildFolder:FindFirstChild("ZoneBuilds")
+    if zoneBuilds then
+        local zoneFolder = zoneBuilds:FindFirstChild(selectedZone) 
+                  or zoneBuilds:FindFirstChild(selectedZone:gsub("%s+", ""))
+                  or zoneBuilds:FindFirstChild(selectedZone:lower())
+        if zoneFolder then
+            local eggsFolder = zoneFolder:FindFirstChild("Eggs") or zoneFolder:FindFirstChild("EggFolder") or zoneFolder:FindFirstChild("Egg")
+            if eggsFolder then
+                for _, egg in ipairs(eggsFolder:GetChildren()) do
+                    local eggName = egg.Name
+                    if not seen[eggName] then
+                        seen[eggName] = true
+                        table.insert(result, eggName)
+                    end
+                end
+            end
+        end
+    end
+    if #result == 0 then
+        table.insert(result, "All Eggs")
+    end
+    return result
+end, function(sel)
+    SelectedEggs = sel
+end)
+
+local hitEggZoneRunning = false
+CreateToggle(EventTab, "Hit Egg Zone", function(state)
+    hitEggZoneRunning = state
+    if not state then
+        local _, _, rootPart = GetCharacter()
+        if rootPart then rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+        return
+    end
+    
+    task.spawn(function()
+        while hitEggZoneRunning do
+            local char, humanoid = GetCharacter()
+            if char and humanoid then
+                local backpack = player:FindFirstChild("Backpack")
+                if backpack then
+                    local pickaxe = backpack:FindFirstChild("Pickaxe") or backpack:FindFirstChild("Axe")
+                    if pickaxe and not char:FindFirstChild("Pickaxe") and not char:FindFirstChild("Axe") then
+                        pcall(function() humanoid:EquipTool(pickaxe) end)
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+    
+    task.spawn(function()
+        local zoneHitMemory = {}
+        
+        while hitEggZoneRunning do
+            if isStealingInProgress then
+                task.wait(0.1)
+                continue
+            end
+
+            local char, humanoid, rootPart = GetCharacter()
+            if not char or not rootPart then
+                task.wait(0.1)
+                continue
+            end
+            
+            local buildFolder = workspace:FindFirstChild("Build")
+            local zoneBuilds = buildFolder and buildFolder:FindFirstChild("ZoneBuilds")
+            local zoneFolder = nil
+            if zoneBuilds then
+                zoneFolder = zoneBuilds:FindFirstChild(selectedZone) 
+                          or zoneBuilds:FindFirstChild(selectedZone:gsub("%s+", ""))
+                          or zoneBuilds:FindFirstChild(selectedZone:lower())
+            end
+            
+            if not zoneFolder then
+                task.wait(0.2)
+                continue
+            end
+            
+            local eggsFolder = zoneFolder:FindFirstChild("Eggs") or zoneFolder:FindFirstChild("EggFolder") or zoneFolder:FindFirstChild("Egg")
+            if not eggsFolder then
+                task.wait(0.2)
+                continue
+            end
+            
+            local activeEggs = {}
+            local anySelected = false
+            for eggName, isSelected in pairs(SelectedEggs) do
+                if isSelected then
+                    anySelected = true
+                    break
+                end
+            end
+
+            for _, egg in ipairs(eggsFolder:GetChildren()) do
+                if not anySelected or SelectedEggs["All Eggs"] or SelectedEggs[egg.Name] then
+                    activeEggs[egg] = true
+                end
+            end
+            
+            for egg in pairs(zoneHitMemory) do
+                if not activeEggs[egg] then
+                    zoneHitMemory[egg] = nil
+                end
+            end
+            
+            local closestEgg = nil
+            local closestEggPos = nil
+            local shortestDist = math.huge
+            for egg, _ in pairs(activeEggs) do
+                if not zoneHitMemory[egg] then
+                    local eggPos = GetObjectPosition(egg)
+                    if eggPos then
+                        local dist = (rootPart.Position - eggPos).Magnitude
+                        if dist < shortestDist then
+                            shortestDist = dist
+                            closestEgg = egg
+                            closestEggPos = eggPos
+                        end
+                    end
+                end
+            end
+            
+            if not closestEgg or not closestEggPos then
+                zoneHitMemory = {}
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                task.wait(0.1)
+                continue
+            end
+            
+            local reached = PerformDash(rootPart, closestEggPos)
+            if reached then
+                zoneHitMemory[closestEgg] = true
+                
+                local eggObj = closestEgg:FindFirstChild("Egg") or closestEgg
+                local remote = ReplicatedStorage:FindFirstChild("EggHitRequest") 
+                            or ReplicatedStorage:FindFirstChild("HitEgg") 
+                            or ReplicatedStorage:FindFirstChild("HitEggRequest")
+                
+                local startTime = tick()
+                while hitEggZoneRunning and (tick() - startTime < 1.2) do
+                    if isStealingInProgress then break end
+                    if not closestEgg or not closestEgg.Parent then break end
+                    if eggObj and (eggObj:FindFirstChild("HitHighlight") or eggObj:FindFirstChild("Highlight")) then break end
+                    
+                    if remote then
+                        pcall(function()
+                            remote:FireServer(eggObj, 31)
+                        end)
+                    end
+                    
+                    task.wait(0.02)
+                end
+            end
+            
+            task.wait(0.03)
+        end
+        
+        local _, _, rootPart = GetCharacter()
+        if rootPart then rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+    end)
+end)
+
+-- ================= [ PLAYER TAB ] ================= --
+local selectedTargetPlayer = nil
+
+CreateDropdown(PlayerTab, "Select Target Player", function()
+    local playerList = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= player then
+            table.insert(playerList, p.Name)
+        end
+    end
+    if #playerList == 0 then
+        table.insert(playerList, "No Players")
+    end
+    return playerList
+end, function(name)
+    selectedTargetPlayer = name
+end, "None")
+
+local dashToPlayerRunning = false
+CreateToggle(PlayerTab, "Dash to Selected Player", function(state)
+    dashToPlayerRunning = state
+    if not state then
+        local _, _, rootPart = GetCharacter()
+        if rootPart then rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+        return
+    end
+    
+    task.spawn(function()
+        while dashToPlayerRunning do
+            local char, humanoid, rootPart = GetCharacter()
+            if not char or not rootPart or not selectedTargetPlayer or selectedTargetPlayer == "No Players" or selectedTargetPlayer == "None" then
+                task.wait(0.2)
+                continue
+            end
+            
+            local targetP = Players:FindFirstChild(selectedTargetPlayer)
+            if targetP and targetP.Character then
+                local targetHrp = targetP.Character:FindFirstChild("HumanoidRootPart")
+                if targetHrp then
+                    PerformDash(rootPart, targetHrp.Position)
+                end
+            else
+                rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+            
+            task.wait(0.03)
+        end
+        
+        local _, _, rootPart = GetCharacter()
+        if rootPart then rootPart.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
+    end)
+end)
+
+-- ================= [ DETAILS TAB ] ================= --
+local CreditsText = Instance.new("TextLabel", DetailsTab) 
+CreditsText.Size = UDim2.new(1, 0, 0, 30) 
+CreditsText.BackgroundTransparency = 1 
+CreditsText.Text = " Break and Steal an Egg" 
+CreditsText.TextColor3 = Theme.Success 
+CreditsText.TextSize = 14 
+CreditsText.Font = Enum.Font.GothamBold 
+
+local DevText = Instance.new("TextLabel", DetailsTab) 
+DevText.Size = UDim2.new(1, 0, 0, 25) 
+DevText.BackgroundTransparency = 1 
+DevText.Text = "🌿 by FARTEZ " 
+DevText.TextColor3 = Theme.Success 
+DevText.TextSize = 13
+DevText.Font = Enum.Font.GothamSemibold 
+
+local ZairosText = Instance.new("TextLabel", DetailsTab) 
+ZairosText.Size = UDim2.new(1, 0, 0, 25) 
+ZairosText.BackgroundTransparency, ZairosText.Text = 1, "👍 Like and follow" 
+ZairosText.TextColor3 = Theme.Success 
+ZairosText.TextSize = 13
+ZairosText.Font = Enum.Font.Gotham 
+
+local AlinurText = Instance.new("TextLabel", DetailsTab) 
+AlinurText.Size = UDim2.new(1, 0, 0, 25) 
+AlinurText.BackgroundTransparency, AlinurText.Text = 1, "▶ YouTube FARTEZ HUB" 
+AlinurText.TextColor3 = Theme.Success 
+AlinurText.TextSize = 13
+AlinurText.Font = Enum.Font.GothamSemibold 
+
+Tabs[1].Page.Visible = true
+Tabs[1].Btn.BackgroundColor3 = Theme.Accent
+Tabs[1].Btn.TextColor3 = Color3.new(0,0,0)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    Main.Visible = not Main.Visible
+end)
