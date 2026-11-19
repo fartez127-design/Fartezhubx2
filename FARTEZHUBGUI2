@@ -5,46 +5,37 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local VirtualUser = game:GetService("VirtualUser")
-local Lighting = game:GetService("Lighting")
-local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- ลบหน้าต่าง UI เก่าทิ้งอัตโนมัติถ้ารันสคริปต์ซ้ำ (ป้องกัน UI ซ้อนกัน)
 if PlayerGui:FindFirstChild("FARTEZ_HUB_UI") then
 	PlayerGui.FARTEZ_HUB_UI:Destroy()
 end
 
 -- ============================================================================
--- [ส่วนที่ 2: ตั้งค่าข้อมูลหลักของ HUB (แก้ไขชื่อ เวอร์ชัน โลโก้ และประกาศตรงนี้)]
+-- [ส่วนที่ 2: ตั้งค่าข้อมูลหลักของ UI]
 -- ============================================================================
 local HubSettings = {
-	HubName = "FARTEZ HUB", -- [แก้ชื่อ HUB] ชื่อหลักที่จะแสดงบนหัวเมนูและหน้าต่างแจ้งเตือน
-	Version = "v1.4.1", -- [แก้เวอร์ชัน] เลขเวอร์ชันที่แสดงใต้ชื่อ HUB และในหน้า Announcements
-	LogoAssetId = "rbxthumb://type=Asset&id=117149073945265&w=150&h=150", -- [แก้โลโก้] เปลี่ยนเลข ID รูปภาพตรงนี้
-	DefaultScale = 0.78, -- [แก้ขนาด UI เริ่มต้น] 0.78 คือ 78% (คุมเฉพาะขนาด UI ไม่เกี่ยวกับขนาดตัวหนังสือ)
-	DefaultTextSize = 13, -- [แก้ขนาดตัวหนังสือเริ่มต้นของฟังก์ชัน] ช่วง 1 - 100 (แยกอิสระจากขนาด UI)
-	KeyTimeText = "lifetime", -- [แก้ข้อความ Key Time] แสดงในหน้า Status และใต้ชื่อโปรไฟล์
-
-	-- [แก้ข้อความประกาศในหน้า Home -> Announcements]
+	HubName = "FARTEZ UI",
+	Version = "v1.4.1",
+	LogoAssetId = "rbxthumb://type=Asset&id=117149073945265&w=150&h=150",
+	DefaultScale = 0.78,
+	DefaultTextSize = 13,
+	KeyTimeText = "lifetime",
 	AnnouncementDate = "2026-11-19",
 	AnnouncementLogs = {
-		"+ Fixed UI Scale & Text Size Independent Smooth Scaling",
-		"+ Fixed Hit Players Causing Movement Controls Disappear",
-		"+ Added Players Tab (Speed 1-1000, Hitbox 1-100)",
-		"+ Added Green ESP, Noclip, Fly & Anti-Knockback",
-		"+ Added Text Size (1-100) & Color Presets"
+		"+ Clean Raw UI Framework Ready",
+		"+ Independent UI Scale & Text Size Scaling",
+		"+ Config Save / Load / Autoload Supported"
 	}
 }
 
--- ============================================
--- ระบบจัดเก็บค่า Config & State กลาง
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 3: ระบบจัดเก็บค่า Config & State กลาง]
+-- ============================================================================
 local HubState = {
 	Toggles = {},
 	Sliders = {},
@@ -57,7 +48,7 @@ local HubState = {
 	AutoloadMode = "Always"
 }
 
-local ConfigFolder = "FARTEZ_HUB_Configs" -- ชื่อโฟลเดอร์สำหรับเก็บไฟล์ Config ในเครื่อง
+local ConfigFolder = "FARTEZ_HUB_Configs"
 local AutoloadFile = ConfigFolder .. "/_autoload.json"
 
 local function HasFileSystem()
@@ -69,19 +60,19 @@ if HasFileSystem() and not isfolder(ConfigFolder) then
 end
 
 -- ============================================================================
--- [ส่วนที่ 3: ตั้งค่าโทนสีของ UI และระบบปรับขนาด/สีแบบแยกอิสระและสมูท]
+-- [ส่วนที่ 4: ธีมสีและระบบปรับขนาด/สีแบบลื่นไหล]
 -- ============================================================================
 local Theme = {
-	BgDark = Color3.fromRGB(14, 15, 16),       -- สีพื้นหลังหน้าต่างหลัก (ดำเข้ม)
-	Sidebar = Color3.fromRGB(18, 20, 21),      -- สีพื้นหลังแถบเมนูด้านซ้าย
-	CardBg = Color3.fromRGB(22, 25, 24),       -- สีพื้นหลังกล่องการ์ดแต่ละหมวด
-	ElementBg = Color3.fromRGB(30, 35, 33),    -- สีพื้นหลังปุ่มกด / ช่องพิมพ์ / กล่อง Status ย่อย
-	Green = Color3.fromRGB(34, 197, 94),       -- สีเขียวหลัก (ปุ่มเปิด, แถบเลื่อน, ขีดบอกสถานะ)
-	GreenDark = Color3.fromRGB(20, 55, 35),    -- สีเขียวเข้ม (พื้นหลังกรอบไอคอนหัวข้อ)
-	Red = Color3.fromRGB(239, 68, 68),         -- สีแดง (ปุ่มปิด UI, ปุ่มลบ Config)
-	Text = Color3.fromRGB(240, 245, 242),      -- สีตัวอักษรหลัก
-	SubText = Color3.fromRGB(145, 155, 150),   -- สีตัวอักษรรอง
-	Border = Color3.fromRGB(35, 42, 39)        -- สีเส้นขอบเริ่มต้น
+	BgDark = Color3.fromRGB(14, 15, 16),
+	Sidebar = Color3.fromRGB(18, 20, 21),
+	CardBg = Color3.fromRGB(22, 25, 24),
+	ElementBg = Color3.fromRGB(30, 35, 33),
+	Green = Color3.fromRGB(34, 197, 94),
+	GreenDark = Color3.fromRGB(20, 55, 35),
+	Red = Color3.fromRGB(239, 68, 68),
+	Text = Color3.fromRGB(240, 245, 242),
+	SubText = Color3.fromRGB(145, 155, 150),
+	Border = Color3.fromRGB(35, 42, 39)
 }
 
 local TextColorPresets = {
@@ -101,7 +92,6 @@ local BorderColorPresets = {
 }
 local BorderColorOrder = { "Red", "Blue", "Green", "Black" }
 
--- แยกตัวแปรสำหรับคุมขนาดตัวหนังสือของฟังก์ชันโดยเฉพาะ (ไม่ปะปนกับ UIScale ของหน้าต่าง)
 local ManagedFeatureLabels = {}
 local ManagedStrokes = {}
 
@@ -155,37 +145,15 @@ local function ApplyBorderColorPreset(presetName)
 	end
 end
 
--- สร้าง ScreenGui หลัก
+-- ============================================================================
+-- [ส่วนที่ 5: โครงสร้างหน้าต่าง UI หลัก + ปุ่มลอย + Sidebar + Header]
+-- ============================================================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "FARTEZ_HUB_UI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = PlayerGui
 
--- ============================================================================
--- [ส่วนที่ 4: หน้าจอดำสำหรับโหมดประหยัดทรัพยากร (Black Screen)]
--- ============================================================================
-local BlackScreenOverlay = Instance.new("Frame")
-BlackScreenOverlay.Name = "BlackScreenOverlay"
-BlackScreenOverlay.Size = UDim2.new(1, 0, 1, 0)
-BlackScreenOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-BlackScreenOverlay.ZIndex = 0
-BlackScreenOverlay.Visible = false
-BlackScreenOverlay.Parent = ScreenGui
-
-local BlackScreenText = Instance.new("TextLabel")
-BlackScreenText.Size = UDim2.new(1, 0, 0, 30)
-BlackScreenText.Position = UDim2.new(0, 0, 0.5, -15)
-BlackScreenText.BackgroundTransparency = 1
-BlackScreenText.Text = HubSettings.HubName .. " - Black Screen Mode Active (CPU/GPU Saver)"
-BlackScreenText.TextColor3 = Theme.Green
-BlackScreenText.Font = Enum.Font.GothamBold
-BlackScreenText.TextSize = 14
-BlackScreenText.Parent = BlackScreenOverlay
-
--- ============================================================================
--- [ส่วนที่ 5: ปุ่มโลโก้ลอยสำหรับเปิด/ปิดหน้าต่าง UI]
--- ============================================================================
 local toggleBtn = Instance.new("ImageButton")
 toggleBtn.Name = "ToggleHubBtn"
 toggleBtn.Parent = ScreenGui
@@ -201,9 +169,6 @@ local toggleStroke = Instance.new("UIStroke", toggleBtn)
 toggleStroke.Color = Theme.Green
 toggleStroke.Thickness = 1.5
 
--- ============================================================================
--- [ส่วนที่ 6: หน้าต่างหลัก (Main Window) และตัวปรับสเกล (UIScale)]
--- ============================================================================
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 740, 0, 480)
@@ -219,7 +184,6 @@ mainStroke.Color = Theme.Border
 mainStroke.Thickness = 1.5
 RegisterBorderStroke(mainStroke)
 
--- UIScale อยู่เฉพาะบน MainFrame ไม่กระทบขนาดตัวอักษรโดยตรง
 local UIScale = Instance.new("UIScale")
 UIScale.Scale = HubSettings.DefaultScale
 UIScale.Parent = MainFrame
@@ -261,9 +225,6 @@ do
 	end)
 end
 
--- ============================================================================
--- [ส่วนที่ 7: แถบเมนูด้านซ้าย (Sidebar) + โลโก้ + โปรไฟล์ผู้เล่น]
--- ============================================================================
 local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.Size = UDim2.new(0, 200, 1, 0)
@@ -399,9 +360,6 @@ StatusLbl.TextSize = 11
 StatusLbl.TextXAlignment = Enum.TextXAlignment.Left
 StatusLbl.Parent = ProfileFrame
 
--- ============================================================================
--- [ส่วนที่ 8: พื้นที่แสดงเนื้อหาฝั่งขวา + ปุ่มซ่อน (—) + ปุ่มปิด (×) พร้อมแจ้งเตือน]
--- ============================================================================
 local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -200, 1, 0)
 ContentArea.Position = UDim2.new(0, 200, 0, 0)
@@ -464,7 +422,7 @@ local DialogDesc = Instance.new("TextLabel")
 DialogDesc.Size = UDim2.new(1, -32, 0, 38)
 DialogDesc.Position = UDim2.new(0, 16, 0, 44)
 DialogDesc.BackgroundTransparency = 1
-DialogDesc.Text = "Are you sure you want to close the UI? All active features will be stopped."
+DialogDesc.Text = "Are you sure you want to close the UI?"
 DialogDesc.TextColor3 = Theme.SubText
 DialogDesc.Font = Enum.Font.Gotham
 DialogDesc.TextSize = 12
@@ -570,7 +528,7 @@ CloseBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================================
--- [ส่วนที่ 9: ระบบสร้างแท็บและตัวช่วยสร้างปุ่ม/การ์ด (UI Builder Functions)]
+-- [ส่วนที่ 6: ตัวช่วยสร้าง UI (UI Builder API)]
 -- ============================================================================
 local TabButtonsContainer = Instance.new("Frame")
 TabButtonsContainer.Size = UDim2.new(1, 0, 1, -130)
@@ -831,7 +789,6 @@ local function AddToggle(container, flagKey, text, default, callback)
 	end
 end
 
--- สไลเดอร์แบบลื่นไหล (อัปเดตตัวเลขและปุ่มเลื่อนทันทีโดยไม่หน่วงค้าง)
 local function AddSmoothSlider(container, flagKey, text, minVal, maxVal, defaultVal, suffix, callback)
 	HubState.Sliders[flagKey] = defaultVal
 
@@ -1068,330 +1025,17 @@ local function AddLabel(container, text, color)
 end
 
 -- ============================================================================
--- [ส่วนที่ 10: ระบบฟังก์ชัน Universal ของ Players Tab (ใช้ได้ทุกเกม)]
+-- [ส่วนที่ 7: ลูป Smooth สเกล UI และขนาดตัวหนังสือ]
 -- ============================================================================
-local defaultWalkSpeed = 16
-local savedOriginalHitboxes = {}
-local espFolder = Instance.new("Folder")
-espFolder.Name = "FARTEZ_PlayerESP_Folder"
-espFolder.Parent = ScreenGui
-
-local function SyncWalkSpeed()
-	local char = LocalPlayer.Character
-	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if not hum then return end
-
-	if HubState.Toggles["SpeedToggle"] then
-		local targetSpeed = tonumber(HubState.Sliders["SpeedValue"]) or 16
-		hum.WalkSpeed = math.clamp(targetSpeed, 1, 1000)
-	else
-		hum.WalkSpeed = defaultWalkSpeed
-	end
-end
-
-local function RestoreAllHitboxes()
-	for plr, origData in pairs(savedOriginalHitboxes) do
-		pcall(function()
-			if plr and plr.Character then
-				local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-				if hrp and origData then
-					hrp.Size = origData.Size
-					hrp.Transparency = origData.Transparency
-					hrp.CanCollide = origData.CanCollide
-				end
-			end
-		end)
-	end
-	savedOriginalHitboxes = {}
-end
-
-local function UpdatePlayerHitboxes()
-	if not HubState.Toggles["HitboxToggle"] then
-		RestoreAllHitboxes()
-		return
-	end
-
-	local sizeVal = math.clamp(tonumber(HubState.Sliders["HitboxSize"]) or 10, 1, 100)
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character then
-			local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-			if hrp then
-				if not savedOriginalHitboxes[plr] then
-					savedOriginalHitboxes[plr] = {
-						Size = hrp.Size,
-						Transparency = hrp.Transparency,
-						CanCollide = hrp.CanCollide
-					}
-				end
-				hrp.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
-				hrp.Transparency = 0.75
-				hrp.CanCollide = false
-			end
-		end
-	end
-end
-
-local function ClearAllESP()
-	for _, item in ipairs(espFolder:GetChildren()) do
-		item:Destroy()
-	end
-end
-
-local function CreateESPForPlayer(plr)
-	if plr == LocalPlayer then return end
-	local existing = espFolder:FindFirstChild("ESP_" .. plr.UserId)
-	if existing then existing:Destroy() end
-
-	local container = Instance.new("Folder")
-	container.Name = "ESP_" .. plr.UserId
-	container.Parent = espFolder
-
-	local function AttachToCharacter(char)
-		if not HubState.Toggles["PlayerESP"] or not char then return end
-		task.spawn(function()
-			local root = char:WaitForChild("HumanoidRootPart", 5)
-			local head = char:WaitForChild("Head", 5)
-			if not root then return end
-
-			local hl = Instance.new("Highlight")
-			hl.Name = "GreenESP_Highlight"
-			hl.Adornee = char
-			hl.FillColor = Color3.fromRGB(34, 197, 94)
-			hl.OutlineColor = Color3.fromRGB(74, 222, 128)
-			hl.FillTransparency = 0.55
-			hl.OutlineTransparency = 0
-			hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-			hl.Parent = container
-
-			local billboard = Instance.new("BillboardGui")
-			billboard.Name = "GreenESP_NameTag"
-			billboard.Adornee = head or root
-			billboard.Size = UDim2.new(0, 160, 0, 26)
-			billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-			billboard.AlwaysOnTop = true
-			billboard.Parent = container
-
-			local nameTag = Instance.new("TextLabel")
-			nameTag.Size = UDim2.new(1, 0, 1, 0)
-			nameTag.BackgroundTransparency = 1
-			nameTag.Text = plr.DisplayName .. " (@" .. plr.Name .. ")"
-			nameTag.TextColor3 = Color3.fromRGB(34, 197, 94)
-			nameTag.Font = Enum.Font.GothamBold
-			nameTag.TextSize = 13
-			nameTag.TextStrokeTransparency = 0.25
-			nameTag.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-			nameTag.Parent = billboard
-		end)
-	end
-
-	if plr.Character then
-		AttachToCharacter(plr.Character)
-	end
-	plr.CharacterAdded:Connect(function(newChar)
-		if HubState.Toggles["PlayerESP"] then
-			AttachToCharacter(newChar)
-		end
-	end)
-end
-
-local function RefreshAllESP()
-	ClearAllESP()
-	if not HubState.Toggles["PlayerESP"] then return end
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer then
-			CreateESPForPlayer(plr)
-		end
-	end
-end
-
-Players.PlayerAdded:Connect(function(plr)
-	if HubState.Toggles["PlayerESP"] then
-		CreateESPForPlayer(plr)
-	end
-end)
-
-Players.PlayerRemoving:Connect(function(plr)
-	savedOriginalHitboxes[plr] = nil
-	local item = espFolder:FindFirstChild("ESP_" .. plr.UserId)
-	if item then item:Destroy() end
-end)
-
-local noclipSavedCollide = {}
-local function ApplyNoclipStep()
-	local char = LocalPlayer.Character
-	if not char then return end
-
-	if HubState.Toggles["Noclip"] then
-		for _, part in ipairs(char:GetDescendants()) do
-			if part:IsA("BasePart") then
-				if noclipSavedCollide[part] == nil then
-					noclipSavedCollide[part] = part.CanCollide
-				end
-				part.CanCollide = false
-			end
-		end
-	elseif next(noclipSavedCollide) ~= nil then
-		for part, origCollide in pairs(noclipSavedCollide) do
-			if part and part.Parent then
-				part.CanCollide = origCollide
-			end
-		end
-		noclipSavedCollide = {}
-	end
-end
-
-local flyBodyVel, flyBodyGyro
-local function StopFly()
-	if flyBodyVel then flyBodyVel:Destroy() flyBodyVel = nil end
-	if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
-	local char = LocalPlayer.Character
-	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if hum and hum.PlatformStand then
-		hum.PlatformStand = false
-	end
-end
-
-local function ApplyFlyStep(dt)
-	local char = LocalPlayer.Character
-	local root = char and char:FindFirstChild("HumanoidRootPart")
-	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if not root or not hum then
-		StopFly()
-		return
-	end
-
-	if not HubState.Toggles["Fly"] then
-		StopFly()
-		return
-	end
-
-	if not flyBodyVel or not flyBodyVel.Parent then
-		flyBodyVel = Instance.new("BodyVelocity")
-		flyBodyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-		flyBodyVel.Velocity = Vector3.zero
-		flyBodyVel.Parent = root
-	end
-
-	if not flyBodyGyro or not flyBodyGyro.Parent then
-		flyBodyGyro = Instance.new("BodyGyro")
-		flyBodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-		flyBodyGyro.P = 1e4
-		flyBodyGyro.Parent = root
-	end
-
-	local cam = workspace.CurrentCamera
-	local flySpeed = tonumber(HubState.Sliders["FlySpeed"]) or 50
-	local moveDir = hum.MoveDirection
-	local vertical = 0
-
-	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vertical += 1 end
-	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vertical -= 1 end
-
-	local camLook = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
-	local camRight = cam and cam.CFrame.RightVector or Vector3.new(1, 0, 0)
-	local finalVel = Vector3.zero
-
-	if moveDir.Magnitude > 0.05 then
-		local forwardAmt = moveDir:Dot(Vector3.new(camLook.X, 0, camLook.Z).Unit)
-		local rightAmt = moveDir:Dot(Vector3.new(camRight.X, 0, camRight.Z).Unit)
-		local dir3D = (camLook * forwardAmt + camRight * rightAmt)
-		if dir3D.Magnitude > 0.05 then
-			finalVel = dir3D.Unit * flySpeed
-		end
-	end
-
-	if vertical ~= 0 then
-		finalVel += Vector3.new(0, vertical * flySpeed, 0)
-	end
-
-	flyBodyVel.Velocity = finalVel
-	if cam then
-		flyBodyGyro.CFrame = CFrame.lookAt(root.Position, root.Position + cam.CFrame.LookVector)
-	end
-end
-
-local function ApplyAntiKnockbackStep()
-	if not HubState.Toggles["GodMode"] then return end
-	local char = LocalPlayer.Character
-	if not char then return end
-
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	local root = char:FindFirstChild("HumanoidRootPart")
-
-	if hum then
-		hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-		hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-		if not HubState.Toggles["Fly"] then
-			hum.PlatformStand = false
-		end
-	end
-
-	if root and not HubState.Toggles["Fly"] then
-		local v = root.AssemblyLinearVelocity
-		local horiz = Vector3.new(v.X, 0, v.Z)
-		if horiz.Magnitude > 120 then
-			root.AssemblyLinearVelocity = Vector3.new(0, math.clamp(v.Y, -50, 50), 0)
-		end
-	end
-end
-
--- ระบบ Hit Players: ไม่ใช้ VirtualUser คลิกหน้าจอเพื่อไม่ให้ปุ่มเดิน/จอยหาย และไม่ไปทับการเดินของตัวละคร
-local lastHitTick = 0
-local function ApplyHitPlayersStep()
-	if not HubState.Toggles["HitPlayers"] then return end
-	if os.clock() - lastHitTick < 0.16 then return end
-
-	local char = LocalPlayer.Character
-	local root = char and char:FindFirstChild("HumanoidRootPart")
-	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if not char or not root or not hum or hum.Health <= 0 then return end
-
-	local equippedTool = char:FindFirstChildOfClass("Tool")
-	if not equippedTool then return end
-
-	local maxRange = tonumber(HubState.Sliders["HitRange"]) or 25
-	local closestRoot = nil
-	local closestDist = maxRange
-
-	for _, plr in ipairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character then
-			local targetHum = plr.Character:FindFirstChildOfClass("Humanoid")
-			local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
-			if targetHum and targetHum.Health > 0 and targetRoot then
-				local dist = (targetRoot.Position - root.Position).Magnitude
-				if dist <= closestDist then
-					closestDist = dist
-					closestRoot = targetRoot
-				end
-			end
-		end
-	end
-
-	if closestRoot then
-		lastHitTick = os.clock()
-		pcall(function()
-			local lookPos = Vector3.new(closestRoot.Position.X, root.Position.Y, closestRoot.Position.Z)
-			if (lookPos - root.Position).Magnitude > 0.25 then
-				local targetCF = CFrame.lookAt(root.Position, lookPos)
-				root.CFrame = root.CFrame:Lerp(targetCF, 0.45)
-			end
-			equippedTool:Activate()
-		end)
-	end
-end
-
--- ลูป Smooth สเกล UI และขนาดตัวหนังสือแยกจากกันอย่างลื่นไหล
 RunService.RenderStepped:Connect(function(dt)
 	local alpha = math.clamp(dt * 18, 0, 1)
 
-	-- 1. ปรับขนาดหน้าต่าง UI แบบลื่นไหล (เฉพาะ UIScale)
 	if math.abs(UIScale.Scale - targetUIScale) > 0.0005 then
 		UIScale.Scale = UIScale.Scale + (targetUIScale - UIScale.Scale) * alpha
 	else
 		UIScale.Scale = targetUIScale
 	end
 
-	-- 2. ปรับขนาดตัวหนังสือของฟังก์ชันแบบลื่นไหล (เฉพาะป้ายชื่อฟังก์ชัน ไม่เกี่ยวกับ UIScale)
 	if math.abs(currentFeatureTextSize - targetFeatureTextSize) > 0.05 then
 		currentFeatureTextSize = currentFeatureTextSize + (targetFeatureTextSize - currentFeatureTextSize) * alpha
 		local intSize = math.clamp(math.floor(currentFeatureTextSize + 0.5), 1, 100)
@@ -1408,160 +1052,24 @@ RunService.RenderStepped:Connect(function(dt)
 			end
 		end
 	end
-
-	ApplyFlyStep(dt)
-	ApplyHitPlayersStep()
-end)
-
-RunService.Heartbeat:Connect(function()
-	if HubState.Toggles["SpeedToggle"] then
-		SyncWalkSpeed()
-	end
-	ApplyNoclipStep()
-	ApplyAntiKnockbackStep()
-	if HubState.Toggles["HitboxToggle"] then
-		UpdatePlayerHitboxes()
-	end
-end)
-
-LocalPlayer.CharacterAdded:Connect(function(newChar)
-	task.wait(0.25)
-	local hum = newChar:FindFirstChildOfClass("Humanoid")
-	if hum then
-		defaultWalkSpeed = hum.WalkSpeed
-		if HubState.Toggles["SpeedToggle"] then
-			SyncWalkSpeed()
-		end
-	end
-	if HubState.Toggles["PlayerESP"] then
-		RefreshAllESP()
-	end
 end)
 
 -- ============================================================================
--- [ส่วนที่ 11: ระบบ Ultra FPS Boost (ปรับภาพต่ำสุด + ลบรายละเอียดที่ไม่จำเป็น)]
--- ============================================================================
-local fpsDescendantConn
-local function StripUnnecessaryDetails(obj)
-	pcall(function()
-		if obj:IsA("BasePart") then
-			obj.Material = Enum.Material.SmoothPlastic
-			obj.Reflectance = 0
-			obj.CastShadow = false
-			if obj:IsA("MeshPart") then
-				obj.RenderFidelity = Enum.RenderFidelity.Performance
-				obj.TextureID = ""
-			end
-		elseif obj:IsA("Decal") or obj:IsA("Texture") then
-			obj.Transparency = 1
-		elseif obj:IsA("SurfaceAppearance") or obj:IsA("ShirtGraphic") or obj:IsA("CharacterMesh") then
-			obj:Destroy()
-		elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-			obj.Enabled = false
-		elseif obj:IsA("Explosion") then
-			obj.Visible = false
-		elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-			obj.Enabled = false
-		elseif obj:IsA("PostEffect") or obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("Clouds") then
-			if obj:IsA("PostEffect") then
-				obj.Enabled = false
-			else
-				obj:Destroy()
-			end
-		end
-	end)
-end
-
-local function EnableUltraFPSBoost()
-	pcall(function()
-		Lighting.GlobalShadows = false
-		Lighting.FogEnd = 9e9
-		Lighting.FogStart = 9e9
-		Lighting.Brightness = 1
-		Lighting.EnvironmentDiffuseScale = 0
-		Lighting.EnvironmentSpecularScale = 0
-		sethiddenproperty(Lighting, "Technology", Enum.Technology.Voxel)
-		settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-		settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
-
-		local terrain = workspace:FindFirstChildOfClass("Terrain")
-		if terrain then
-			terrain.WaterWaveSize = 0
-			terrain.WaterWaveSpeed = 0
-			terrain.WaterReflectance = 0
-			terrain.WaterTransparency = 0
-			terrain.Decoration = false
-		end
-
-		for _, v in ipairs(Lighting:GetChildren()) do
-			StripUnnecessaryDetails(v)
-		end
-		for _, v in ipairs(workspace:GetDescendants()) do
-			StripUnnecessaryDetails(v)
-		end
-
-		if not fpsDescendantConn then
-			fpsDescendantConn = workspace.DescendantAdded:Connect(function(desc)
-				if HubState.Toggles["UltraFPS"] then
-					StripUnnecessaryDetails(desc)
-				end
-			end)
-		end
-	end)
-end
-
--- ============================================================================
--- [ส่วนที่ 12: สร้างรายชื่อแท็บหลักในแถบเมนูซ้าย]
+-- [ส่วนที่ 8: แท็บเริ่มต้น Home และแท็บ Settings (UI + Configs)]
 -- ============================================================================
 AddCategoryLabel("MAIN")
 local HomeTab = CreateTab("Home", "🏠")
-local PlayersTab = CreateTab("Players", "👤")
-local MiscTab = CreateTab("Misc", "🔧")
 
 AddCategoryLabel("OTHER")
 local SettingsTab = CreateTab("Settings", "⚙️")
 
--- ============================================================================
--- [ส่วนที่ 13: เนื้อหาแท็บ Home (Announcements + Status 6 ช่องเรียลไทม์)]
--- ============================================================================
 local AnnounceCard = CreateCard(HomeTab.Left, "Announcements", "🔔", true)
-
-local verLabel = Instance.new("TextLabel")
-verLabel.Size = UDim2.new(1, 0, 0, 20)
-verLabel.BackgroundTransparency = 1
-verLabel.Text = HubSettings.Version
-verLabel.TextColor3 = Theme.Text
-verLabel.Font = Enum.Font.GothamBold
-verLabel.TextSize = 14
-verLabel.TextXAlignment = Enum.TextXAlignment.Left
-verLabel.Parent = AnnounceCard
-
-local dateLabel = Instance.new("TextLabel")
-dateLabel.Size = UDim2.new(1, 0, 0, 16)
-dateLabel.BackgroundTransparency = 1
-dateLabel.Text = HubSettings.AnnouncementDate
-dateLabel.TextColor3 = Theme.SubText
-dateLabel.Font = Enum.Font.Gotham
-dateLabel.TextSize = 12
-dateLabel.TextXAlignment = Enum.TextXAlignment.Left
-dateLabel.Parent = AnnounceCard
-
+AddLabel(AnnounceCard, HubSettings.Version .. " (" .. HubSettings.AnnouncementDate .. ")", Theme.Text)
 for _, logLine in ipairs(HubSettings.AnnouncementLogs) do
-	local itemLbl = Instance.new("TextLabel")
-	itemLbl.Size = UDim2.new(1, 0, 0, 18)
-	itemLbl.BackgroundTransparency = 1
-	itemLbl.Text = logLine
-	itemLbl.TextColor3 = Theme.SubText
-	itemLbl.Font = Enum.Font.Gotham
-	itemLbl.TextSize = 12
-	itemLbl.TextXAlignment = Enum.TextXAlignment.Left
-	itemLbl.TextWrapped = true
-	itemLbl.AutomaticSize = Enum.AutomaticSize.Y
-	itemLbl.Parent = AnnounceCard
+	AddLabel(AnnounceCard, logLine, Theme.SubText)
 end
 
 local StatusCard = CreateCard(HomeTab.Right, "Status", "🕒", true)
-
 local StatusGrid = Instance.new("Frame")
 StatusGrid.Size = UDim2.new(1, 0, 0, 130)
 StatusGrid.BackgroundTransparency = 1
@@ -1627,9 +1135,7 @@ end)
 task.spawn(function()
 	while ScreenGui and ScreenGui.Parent do
 		local elapsed = math.floor(os.clock() - startTime)
-		local mins = math.floor(elapsed / 60)
-		local secs = elapsed % 60
-		statSessionLbl.Text = string.format("%dm %ds", mins, secs)
+		statSessionLbl.Text = string.format("%dm %ds", math.floor(elapsed / 60), elapsed % 60)
 
 		local activeCount = 0
 		for _, isOn in pairs(HubState.Toggles) do
@@ -1646,189 +1152,27 @@ task.spawn(function()
 		end)
 		statPingLbl.Text = tostring(pingVal) .. " ms"
 		statPlayersLbl.Text = tostring(#Players:GetPlayers()) .. "/" .. tostring(Players.MaxPlayers)
-
 		task.wait(1)
 	end
 end)
 
--- ============================================================================
--- [ส่วนที่ 14: เนื้อหาแท็บ Players (Speed, Hitbox, ESP, Noclip, Fly, God Mode, Hit Players)]
--- ============================================================================
-local MovementCard = CreateCard(PlayersTab.Left, "Movement & Mod", "⚡", true)
-AddToggle(MovementCard, "SpeedToggle", "Speed", false, function(state)
-	SyncWalkSpeed()
-end)
-AddSmoothSlider(MovementCard, "SpeedValue", "Walk Speed", 1, 1000, 16, "", function(val)
-	if HubState.Toggles["SpeedToggle"] then
-		SyncWalkSpeed()
-	end
-end)
-
-AddToggle(MovementCard, "Noclip", "Noclip", false, function(state)
-	if not state then
-		ApplyNoclipStep()
-	end
-end)
-
-AddToggle(MovementCard, "Fly", "Fly", false, function(state)
-	if not state then
-		StopFly()
-	end
-end)
-AddSmoothSlider(MovementCard, "FlySpeed", "Fly Speed", 10, 500, 50, "", function(val) end)
-
-AddToggle(MovementCard, "GodMode", "God Mode (No Knockback)", false, function(state) end)
-
-local CombatVisualCard = CreateCard(PlayersTab.Right, "Combat & Visuals", "🎯", true)
-AddToggle(CombatVisualCard, "HitboxToggle", "Hitbox", false, function(state)
-	UpdatePlayerHitboxes()
-end)
-AddSmoothSlider(CombatVisualCard, "HitboxSize", "Hitbox Size", 1, 100, 15, "", function(val)
-	if HubState.Toggles["HitboxToggle"] then
-		UpdatePlayerHitboxes()
-	end
-end)
-
-AddToggle(CombatVisualCard, "PlayerESP", "ESP Players (Green)", false, function(state)
-	RefreshAllESP()
-end)
-
-AddToggle(CombatVisualCard, "HitPlayers", "Hit Players (Auto Attack)", false, function(state) end)
-AddSmoothSlider(CombatVisualCard, "HitRange", "Hit Range", 5, 100, 25, " studs", function(val) end)
-
--- ============================================================================
--- [ส่วนที่ 15: เนื้อหาแท็บ Misc (ฟังก์ชันสำเร็จรูป ใช้ได้จริงทุกเกม)]
--- ============================================================================
-local PerfCard = CreateCard(MiscTab.Left, "Performance", "📊", true)
-
-AddToggle(PerfCard, "BlackScreen", "Black Screen", false, function(state)
-	BlackScreenOverlay.Visible = state
-	RunService:Set3dRenderingEnabled(not state)
-end)
-
-AddToggle(PerfCard, "UltraFPS", "Ultra FPS Boost", false, function(state)
-	if state then
-		EnableUltraFPSBoost()
-	else
-		if fpsDescendantConn then
-			fpsDescendantConn:Disconnect()
-			fpsDescendantConn = nil
-		end
-		pcall(function()
-			Lighting.GlobalShadows = true
-			settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-		end)
-	end
-end)
-
-local ProtCard = CreateCard(MiscTab.Left, "Protection", "🛡️", true)
-
-local antiAfkConn
-AddToggle(ProtCard, "AntiAFK", "Anti AFK", true, function(state)
-	if state then
-		if not antiAfkConn then
-			antiAfkConn = LocalPlayer.Idled:Connect(function()
-				VirtualUser:CaptureController()
-				VirtualUser:ClickButton2(Vector2.new())
-			end)
-		end
-	else
-		if antiAfkConn then
-			antiAfkConn:Disconnect()
-			antiAfkConn = nil
-		end
-	end
-end)
-
-local SessionCard = CreateCard(MiscTab.Right, "Session", "🔄", true)
-
-AddToggle(SessionCard, "AutoExecute", "Auto Execute", false, function(state)
-	if state then
-		local qot = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
-		if qot then
-			pcall(function()
-				qot('print("' .. HubSettings.HubName .. ' Auto-Executed!")')
-			end)
-		end
-	end
-end)
-
-local autoReconnectConn
-AddToggle(SessionCard, "AutoReconnect", "Auto Reconnect", false, function(state)
-	if state then
-		if not autoReconnectConn then
-			autoReconnectConn = GuiService.ErrorMessageChanged:Connect(function()
-				task.wait(1.5)
-				if #Players:GetPlayers() <= 1 then
-					TeleportService:Teleport(game.PlaceId, LocalPlayer)
-				else
-					TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-				end
-			end)
-		end
-	else
-		if autoReconnectConn then
-			autoReconnectConn:Disconnect()
-			autoReconnectConn = nil
-		end
-	end
-end)
-
-local ServerCard = CreateCard(MiscTab.Right, "Server", "🌐", true)
-
-local currentJobId = tostring(game.JobId ~= "" and game.JobId or "Studio-Local-Server")
-AddLabel(ServerCard, "Job ID: " .. currentJobId, Theme.SubText)
-
-local copyBtn = AddButton(ServerCard, "Copy Job ID", Theme.Text, function() end)
-copyBtn.MouseButton1Click:Connect(function()
-	if setclipboard then
-		setclipboard(currentJobId)
-		copyBtn.Text = "Copied!"
-		copyBtn.TextColor3 = Theme.Green
-		task.delay(1.5, function()
-			copyBtn.Text = "Copy Job ID"
-			copyBtn.TextColor3 = Theme.Text
-		end)
-	end
-end)
-
-AddButton(ServerCard, "Rejoin", Theme.Text, function()
-	if #Players:GetPlayers() <= 1 then
-		TeleportService:Teleport(game.PlaceId, LocalPlayer)
-	else
-		TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-	end
-end)
-
--- ============================================================================
--- [ส่วนที่ 16: เนื้อหาแท็บ Settings (ปรับขนาด UI / ขนาดตัวหนังสือแยกอิสระ + สี + ล็อค + Configs)]
--- ============================================================================
 local UISettingsCard = CreateCard(SettingsTab.Left, "UI Settings", "⚙️", true)
-
--- ปรับขนาดหน้าต่าง UI (ไม่ยุ่งกับขนาดตัวหนังสือ)
 AddSmoothSlider(UISettingsCard, "UIScalePct", "UI Scale", 1, 100, math.floor(HubSettings.DefaultScale * 100), "%", function(pct)
 	targetUIScale = math.clamp(pct / 100, 0.01, 1)
 end)
-
--- ปรับขนาดตัวหนังสือตามฟังก์ชันต่างๆ 1 - 100 (แยกอิสระจากขนาด UI)
 AddSmoothSlider(UISettingsCard, "FeatureTextSize", "Text Size", 1, 100, HubSettings.DefaultTextSize, " px", function(sz)
 	SetTargetFeatureTextSize(sz)
 end)
-
 AddOptionSelector(UISettingsCard, "FeatureTextColor", "Text Color", TextColorOrder, "White", function(colorName)
 	ApplyTextColorPreset(colorName)
 end)
-
 AddOptionSelector(UISettingsCard, "UIBorderColor", "Border Color", BorderColorOrder, "Green", function(borderName)
 	ApplyBorderColorPreset(borderName)
 end)
-
 AddToggle(UISettingsCard, "LockUI", "Lock UI Position", false, function(v) end)
 AddToggle(UISettingsCard, "LockToggleBtn", "Lock Toggle Button", false, function(v) end)
 
--- กล่องจัดการ Configs
 local ConfigsCard = CreateCard(SettingsTab.Right, "Configs", "📁", true)
-
 local configNameInput = Instance.new("TextBox")
 configNameInput.Size = UDim2.new(1, 0, 0, 32)
 configNameInput.BackgroundColor3 = Theme.ElementBg
@@ -1893,8 +1237,7 @@ Instance.new("UICorner", dropdownListFrame).CornerRadius = UDim.new(0, 8)
 local ddListStroke = Instance.new("UIStroke", dropdownListFrame)
 ddListStroke.Color = Theme.Border
 RegisterBorderStroke(ddListStroke)
-local ddListLayout = Instance.new("UIListLayout", dropdownListFrame)
-ddListLayout.Padding = UDim.new(0, 2)
+Instance.new("UIListLayout", dropdownListFrame).Padding = UDim.new(0, 2)
 
 local statusInfoLbl = AddLabel(ConfigsCard, "loaded: none | autoload: none", Theme.SubText)
 
@@ -2129,8 +1472,28 @@ if HasFileSystem() and isfile(AutoloadFile) then
 end
 
 -- ============================================================================
--- [ส่วนที่ 17: ตั้งค่าแท็บเริ่มต้นเมื่อเปิดสคริปต์ (Home)]
+-- [ส่วนที่ 9: เปิด API ให้สคริปต์ฝั่งเกมเรียกสร้างแท็บ/การ์ด/ปุ่มได้ทันที]
 -- ============================================================================
+_G.FARTEZ_UI_API = {
+	ScreenGui = ScreenGui,
+	MainFrame = MainFrame,
+	Theme = Theme,
+	State = HubState,
+	AddCategoryLabel = AddCategoryLabel,
+	CreateTab = CreateTab,
+	CreateCard = CreateCard,
+	AddToggle = AddToggle,
+	AddSmoothSlider = AddSmoothSlider,
+	AddButton = AddButton,
+	AddOptionSelector = AddOptionSelector,
+	AddLabel = AddLabel,
+	SelectTab = function(tabName)
+		if TabButtons[tabName] then
+			TabButtons[tabName].Btn:Activate()
+		end
+	end
+}
+
 TabButtons["Home"].Indicator.Visible = true
 TabButtons["Home"].Label.TextColor3 = Theme.Text
 TabButtons["Home"].Btn.BackgroundTransparency = 0.4
