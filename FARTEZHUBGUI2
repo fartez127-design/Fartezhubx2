@@ -1,5 +1,5 @@
 -- ============================================================================
--- [ส่วนที่ 1: เรียกใช้งาน Service พื้นฐานของ Roblox]
+-- FARTEZ HUB - Steal A Balut (Integrated UI + Master Bridge)
 -- ============================================================================
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -7,6 +7,9 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
+local RS = game:GetService("ReplicatedStorage")
+local WS = game:GetService("Workspace")
+local VirtualUser = game:GetService("VirtualUser")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -29,7 +32,7 @@ local HubSettings = {
 	AnnouncementLogs = {
 		"+ Clean Raw UI Framework Ready",
 		"+ Independent UI Scale & Text Size Scaling",
-		"+ Config Save / Load / Autoload Supported"
+		"+ Steal A Balut Features Linked"
 	}
 }
 
@@ -530,10 +533,14 @@ end)
 -- ============================================================================
 -- [ส่วนที่ 6: ตัวช่วยสร้าง UI (UI Builder API)]
 -- ============================================================================
-local TabButtonsContainer = Instance.new("Frame")
+local TabButtonsContainer = Instance.new("ScrollingFrame")
 TabButtonsContainer.Size = UDim2.new(1, 0, 1, -130)
 TabButtonsContainer.Position = UDim2.new(0, 0, 0, 68)
 TabButtonsContainer.BackgroundTransparency = 1
+TabButtonsContainer.BorderSizePixel = 0
+TabButtonsContainer.ScrollBarThickness = 2
+TabButtonsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+TabButtonsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 TabButtonsContainer.Parent = Sidebar
 
 local TabListLayout = Instance.new("UIListLayout")
@@ -1055,14 +1062,22 @@ RunService.RenderStepped:Connect(function(dt)
 end)
 
 -- ============================================================================
--- [ส่วนที่ 8: แท็บเริ่มต้น Home และแท็บ Settings (UI + Configs)]
+-- [ส่วนที่ 8: แท็บ Home, ฟีเจอร์ Steal A Balut และแท็บ Settings]
 -- ============================================================================
 AddCategoryLabel("MAIN")
 local HomeTab = CreateTab("Home", "🏠")
 
+AddCategoryLabel("GAME")
+local FarmTab = CreateTab("Farm", "🌾")
+local StealTab = CreateTab("Steal", "🥷")
+local BuyTab = CreateTab("Buy Buff", "🧪")
+local SellTab = CreateTab("Sell", "💰")
+local MiscTab = CreateTab("Misc", "✨")
+
 AddCategoryLabel("OTHER")
 local SettingsTab = CreateTab("Settings", "⚙️")
 
+-- Home Tab
 local AnnounceCard = CreateCard(HomeTab.Left, "Announcements", "🔔", true)
 AddLabel(AnnounceCard, HubSettings.Version .. " (" .. HubSettings.AnnouncementDate .. ")", Theme.Text)
 for _, logLine in ipairs(HubSettings.AnnouncementLogs) do
@@ -1156,6 +1171,215 @@ task.spawn(function()
 	end
 end)
 
+-- ============================================================================
+-- เชื่อมตัวแปรและฟังก์ชันจากสคริปต์หลัก (_G.FARTEZ)
+-- ============================================================================
+local GameAPI = _G.FARTEZ or _G.FARTEZ_HUB_API or {}
+local GameState = GameAPI.State or _G.State or {}
+local ZoneNames = GameAPI.ZoneNames or {}
+local MutationsList = GameAPI.MUTATIONS or {}
+
+local zoneOptions = {}
+for z = 1, 10 do
+	local zName = ZoneNames[z] and ("Zone " .. z .. " - " .. tostring(ZoneNames[z])) or ("Zone " .. z)
+	table.insert(zoneOptions, zName)
+end
+
+local function ZoneLabelToId(labelStr)
+	local num = tonumber(tostring(labelStr):match("Zone%s*(%d+)"))
+	return num or 1
+end
+
+-- Farm Tab
+local FarmCard = CreateCard(FarmTab.Left, "Auto Egg Farm", "🥚", true)
+AddToggle(FarmCard, "AutoFarm", "Auto Farm Eggs", GameState.AutoFarm == true, function(val)
+	GameState.AutoFarm = val
+	if val and type(GameAPI.StartFarm) == "function" then
+		GameAPI.StartFarm()
+	elseif (not val) and type(GameAPI.StopFarm) == "function" then
+		GameAPI.StopFarm()
+	end
+end)
+
+AddToggle(FarmCard, "AutoEquip", "Auto Equip Best Tool", GameState.AutoEquip ~= false, function(val)
+	GameState.AutoEquip = val
+end)
+
+AddOptionSelector(FarmCard, "TargetZone", "Target Zone", zoneOptions, zoneOptions[GameState.TargetZone or 1] or zoneOptions[1], function(selectedLabel)
+	local zId = ZoneLabelToId(selectedLabel)
+	GameState.TargetZone = zId
+	GameState.BoostKeepZone = zId
+end)
+
+AddOptionSelector(FarmCard, "EggTargetMode", "Egg Priority Mode", { "normal", "fast", "lucky", "big" }, GameState.EggTargetMode or "normal", function(modeVal)
+	GameState.EggTargetMode = modeVal
+end)
+
+local PerfCard = CreateCard(FarmTab.Right, "Performance & FPS", "⚡", true)
+AddToggle(PerfCard, "BoostFPS", "Boost FPS (Hide Plots & Decor)", GameState.BoostFPS == true, function(val)
+	if val and type(GameAPI.EnableBoostFPS) == "function" then
+		GameAPI.EnableBoostFPS()
+	elseif (not val) and type(GameAPI.DisableBoostFPS) == "function" then
+		GameAPI.DisableBoostFPS()
+	end
+end)
+
+AddToggle(PerfCard, "BoostLowGraphics", "Low Graphics Mode", GameState.BoostLowGraphics == true, function(val)
+	GameState.BoostLowGraphics = val
+	if type(GameAPI.Boost_LowGraphics) == "function" then
+		GameAPI.Boost_LowGraphics(val)
+	end
+end)
+
+-- Steal Tab
+local StealCard = CreateCard(StealTab.Left, "Auto Steal", "🐾", true)
+AddToggle(StealCard, "AutoSteal", "Auto Steal Wild Pets", GameState.AutoSteal == true, function(val)
+	GameState.AutoSteal = val
+	if val and type(GameAPI.StartSteal) == "function" then
+		GameAPI.StartSteal()
+	elseif (not val) and type(GameAPI.StopSteal) == "function" then
+		GameAPI.StopSteal()
+	end
+end)
+
+AddOptionSelector(StealCard, "TargetMode", "Target Priority Mode", { "income", "balanced", "nearest" }, GameState.TargetMode or "income", function(modeVal)
+	GameState.TargetMode = modeVal
+end)
+
+AddSmoothSlider(StealCard, "StealCooldown", "Steal Cooldown", 1, 15, GameState.StealCooldown or 3, "s", function(sec)
+	GameState.StealCooldown = sec
+end)
+
+local StealFilterCard = CreateCard(StealTab.Right, "Steal Filters & Actions", "🎯", true)
+AddSmoothSlider(StealFilterCard, "FilterMinIncome", "Min Income Filter", 0, 1000000000, GameState.FilterMinIncome or 0, "", function(minInc)
+	GameState.FilterMinIncome = minInc
+end)
+
+AddButton(StealFilterCard, "Drop Carrying Pet Now", Theme.Gold, function()
+	pcall(function()
+		local remotes = GameAPI.Remotes or (RS:FindFirstChild("Remotes"))
+		if remotes and remotes:FindFirstChild("DropPet") then
+			remotes.DropPet:FireServer()
+		end
+	end)
+end)
+
+-- Buy Buff Tab
+local BuffCard = CreateCard(BuyTab.Left, "Albularyo Auto Buy", "🧪", true)
+local buffStatusLbl = AddLabel(BuffCard, "Stock: -- | Bought: 0", Theme.SubText)
+
+AddToggle(BuffCard, "AutoBuyBuff", "Auto Buy Wanted Mutations", GameState.AutoBuyBuff == true, function(val)
+	GameState.AutoBuyBuff = val
+end)
+
+GameState.WantedMutations = GameState.WantedMutations or {}
+AddToggle(BuffCard, "Mut_All", "Select All Mutations", false, function(val)
+	for _, m in ipairs(MutationsList) do
+		GameState.WantedMutations[m.id] = val
+		if HubState.ToggleSetters["Mut_" .. m.id] then
+			HubState.ToggleSetters["Mut_" .. m.id](val)
+		end
+	end
+end)
+
+local MutListCard = CreateCard(BuyTab.Right, "Wanted Mutations", "✨", true)
+for _, m in ipairs(MutationsList) do
+	local dispName = (m.display ~= m.id) and (m.display .. " (" .. m.id .. ")") or m.id
+	AddToggle(MutListCard, "Mut_" .. m.id, dispName .. " [x" .. tostring(m.mult) .. "]", GameState.WantedMutations[m.id] == true, function(val)
+		GameState.WantedMutations[m.id] = val
+	end)
+end
+
+AddButton(BuffCard, "Buy Selected Stock Now", Theme.Green, function()
+	if type(GameAPI.GetAlbStock) == "function" and type(GameAPI.TryBuyMutation) == "function" then
+		local slots = GameAPI.GetAlbStock()
+		for slotIdx, mutId in ipairs(slots) do
+			if mutId ~= "" and GameState.WantedMutations[mutId] then
+				task.spawn(function()
+					GameAPI.TryBuyMutation(slotIdx, mutId)
+				end)
+			end
+		end
+	end
+end)
+
+AddButton(BuffCard, "Refresh Stock Status", Theme.Text, function()
+	local stockStr = "None"
+	if type(GameAPI.GetAlbStock) == "function" then
+		local s = GameAPI.GetAlbStock()
+		if #s > 0 then stockStr = table.concat(s, ", ") end
+	end
+	buffStatusLbl.Text = "Stock: " .. stockStr .. " | Bought: " .. tostring(GameState.AlbTotalBought or 0)
+end)
+
+-- Sell Tab
+local SellCard = CreateCard(SellTab.Left, "Auto Sell Pets", "💰", true)
+local sellInfoLbl = AddLabel(SellCard, "Backpack Pets: --", Theme.SubText)
+
+AddToggle(SellCard, "AutoSell", "Auto Sell Filtered Rarities", GameState.AutoSell == true, function(val)
+	GameState.AutoSell = val
+end)
+
+GameState.SellFilterRarities = GameState.SellFilterRarities or {}
+local RarityList = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Divine", "Secret" }
+
+local SellFilterCard = CreateCard(SellTab.Right, "Sell Rarity Filter", "📦", true)
+for _, rName in ipairs(RarityList) do
+	AddToggle(SellFilterCard, "SellRarity_" .. rName, rName, GameState.SellFilterRarities[rName] == true, function(val)
+		if val then
+			GameState.SellFilterRarities[rName] = true
+		else
+			GameState.SellFilterRarities[rName] = nil
+		end
+	end)
+end
+
+local function SellMatchingPetsNow()
+	if type(GameAPI.GetAllBackpackPets) ~= "function" then return end
+	local pets = GameAPI.GetAllBackpackPets()
+	local rarities = GameState.SellFilterRarities or {}
+	local toSell = {}
+	for _, pet in ipairs(pets) do
+		if not pet.IsLocked and rarities[pet.Rarity] == true then
+			table.insert(toSell, pet.Uid)
+		end
+	end
+	if #toSell > 0 then
+		local remotes = GameAPI.Remotes or (RS:FindFirstChild("Remotes"))
+		if remotes and remotes:FindFirstChild("PetAction") then
+			pcall(function()
+				remotes.PetAction:InvokeServer("Sell", toSell)
+			end)
+		end
+	end
+	sellInfoLbl.Text = "Total Pets: " .. tostring(#pets) .. " | Sold: " .. tostring(#toSell)
+end
+
+AddButton(SellCard, "Sell Matching Pets Now", Theme.Gold, SellMatchingPetsNow)
+AddButton(SellCard, "Refresh Backpack Count", Theme.Text, function()
+	if type(GameAPI.GetAllBackpackPets) == "function" then
+		local pets = GameAPI.GetAllBackpackPets()
+		sellInfoLbl.Text = "Backpack Pets: " .. tostring(#pets)
+	end
+end)
+
+-- Misc Tab
+local MiscCard = CreateCard(MiscTab.Left, "Protection & Hotkeys", "🛡️", true)
+AddToggle(MiscCard, "AntiAfk", "Anti-AFK", GameState.AntiAfk == true, function(val)
+	GameState.AntiAfk = val
+end)
+AddLabel(MiscCard, "Hotkey [F]: Toggle Auto Farm", Theme.SubText)
+AddLabel(MiscCard, "Hotkey [G]: Toggle Auto Steal", Theme.SubText)
+AddLabel(MiscCard, "Hotkey [B]: Toggle Boost FPS", Theme.SubText)
+
+LocalPlayer.Idled:Connect(function()
+	if GameState.AntiAfk then
+		VirtualUser:CaptureController()
+		VirtualUser:ClickButton2(Vector2.new(0, 0))
+	end
+end)
+
+-- Settings Tab (UI + Configs)
 local UISettingsCard = CreateCard(SettingsTab.Left, "UI Settings", "⚙️", true)
 AddSmoothSlider(UISettingsCard, "UIScalePct", "UI Scale", 1, 100, math.floor(HubSettings.DefaultScale * 100), "%", function(pct)
 	targetUIScale = math.clamp(pct / 100, 0.01, 1)
