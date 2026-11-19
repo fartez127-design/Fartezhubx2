@@ -1,3 +1,6 @@
+-- ============================================================================
+-- [ส่วนที่ 1: เรียกใช้งาน Service พื้นฐานของ Roblox]
+-- ============================================================================
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -7,64 +10,161 @@ local VirtualUser = game:GetService("VirtualUser")
 local Lighting = game:GetService("Lighting")
 local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Remove existing UI if present
+-- ลบหน้าต่าง UI เก่าทิ้งอัตโนมัติถ้ารันสคริปต์ซ้ำ (ป้องกัน UI ซ้อนกัน)
 if PlayerGui:FindFirstChild("FARTEZ_HUB_UI") then
-    PlayerGui.FARTEZ_HUB_UI:Destroy()
+	PlayerGui.FARTEZ_HUB_UI:Destroy()
 end
 
--- ============================================
--- Global Config & State Storage (Universal)
--- ============================================
-local HubState = {
-    Toggles = {},
-    Sliders = {},
-    ToggleSetters = {},
-    SliderSetters = {},
-    CurrentConfig = "none",
-    AutoloadConfig = "none",
-    AutoloadMode = "Always"
+-- ============================================================================
+-- [ส่วนที่ 2: ตั้งค่าข้อมูลหลักของ HUB (แก้ไขชื่อ เวอร์ชัน โลโก้ และประกาศตรงนี้)]
+-- ============================================================================
+local HubSettings = {
+	HubName = "FARTEZ HUB", -- [แก้ชื่อ HUB] ชื่อหลักที่จะแสดงบนหัวเมนูและหน้าต่างแจ้งเตือน
+	Version = "v1.4.1", -- [แก้เวอร์ชัน] เลขเวอร์ชันที่แสดงใต้ชื่อ HUB และในหน้า Announcements
+	LogoAssetId = "rbxthumb://type=Asset&id=117149073945265&w=150&h=150", -- [แก้โลโก้] เปลี่ยนเลข ID รูปภาพตรงนี้
+	DefaultScale = 0.78, -- [แก้ขนาด UI เริ่มต้น] 0.78 คือ 78% (คุมเฉพาะขนาด UI ไม่เกี่ยวกับขนาดตัวหนังสือ)
+	DefaultTextSize = 13, -- [แก้ขนาดตัวหนังสือเริ่มต้นของฟังก์ชัน] ช่วง 1 - 100 (แยกอิสระจากขนาด UI)
+	KeyTimeText = "lifetime", -- [แก้ข้อความ Key Time] แสดงในหน้า Status และใต้ชื่อโปรไฟล์
+
+	-- [แก้ข้อความประกาศในหน้า Home -> Announcements]
+	AnnouncementDate = "2026-11-19",
+	AnnouncementLogs = {
+		"+ Fixed UI Scale & Text Size Independent Smooth Scaling",
+		"+ Fixed Hit Players Causing Movement Controls Disappear",
+		"+ Added Players Tab (Speed 1-1000, Hitbox 1-100)",
+		"+ Added Green ESP, Noclip, Fly & Anti-Knockback",
+		"+ Added Text Size (1-100) & Color Presets"
+	}
 }
 
-local ConfigFolder = "FARTEZ_HUB_Configs"
+-- ============================================
+-- ระบบจัดเก็บค่า Config & State กลาง
+-- ============================================
+local HubState = {
+	Toggles = {},
+	Sliders = {},
+	Dropdowns = {},
+	ToggleSetters = {},
+	SliderSetters = {},
+	DropdownSetters = {},
+	CurrentConfig = "none",
+	AutoloadConfig = "none",
+	AutoloadMode = "Always"
+}
+
+local ConfigFolder = "FARTEZ_HUB_Configs" -- ชื่อโฟลเดอร์สำหรับเก็บไฟล์ Config ในเครื่อง
 local AutoloadFile = ConfigFolder .. "/_autoload.json"
 
 local function HasFileSystem()
-    return (writefile and readfile and isfile and makefolder and isfolder and listfiles and delfile) ~= nil
+	return (writefile and readfile and isfile and makefolder and isfolder and listfiles and delfile) ~= nil
 end
 
 if HasFileSystem() and not isfolder(ConfigFolder) then
-    pcall(function() makefolder(ConfigFolder) end)
+	pcall(function() makefolder(ConfigFolder) end)
 end
 
--- ============================================
--- Theme Colors (Black & Emerald Green)
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 3: ตั้งค่าโทนสีของ UI และระบบปรับขนาด/สีแบบแยกอิสระและสมูท]
+-- ============================================================================
 local Theme = {
-    BgDark = Color3.fromRGB(14, 15, 16),
-    Sidebar = Color3.fromRGB(18, 20, 21),
-    CardBg = Color3.fromRGB(22, 25, 24),
-    ElementBg = Color3.fromRGB(30, 35, 33),
-    Green = Color3.fromRGB(34, 197, 94),
-    GreenDark = Color3.fromRGB(20, 55, 35),
-    Red = Color3.fromRGB(239, 68, 68),
-    Text = Color3.fromRGB(240, 245, 242),
-    SubText = Color3.fromRGB(145, 155, 150),
-    Border = Color3.fromRGB(35, 42, 39)
+	BgDark = Color3.fromRGB(14, 15, 16),       -- สีพื้นหลังหน้าต่างหลัก (ดำเข้ม)
+	Sidebar = Color3.fromRGB(18, 20, 21),      -- สีพื้นหลังแถบเมนูด้านซ้าย
+	CardBg = Color3.fromRGB(22, 25, 24),       -- สีพื้นหลังกล่องการ์ดแต่ละหมวด
+	ElementBg = Color3.fromRGB(30, 35, 33),    -- สีพื้นหลังปุ่มกด / ช่องพิมพ์ / กล่อง Status ย่อย
+	Green = Color3.fromRGB(34, 197, 94),       -- สีเขียวหลัก (ปุ่มเปิด, แถบเลื่อน, ขีดบอกสถานะ)
+	GreenDark = Color3.fromRGB(20, 55, 35),    -- สีเขียวเข้ม (พื้นหลังกรอบไอคอนหัวข้อ)
+	Red = Color3.fromRGB(239, 68, 68),         -- สีแดง (ปุ่มปิด UI, ปุ่มลบ Config)
+	Text = Color3.fromRGB(240, 245, 242),      -- สีตัวอักษรหลัก
+	SubText = Color3.fromRGB(145, 155, 150),   -- สีตัวอักษรรอง
+	Border = Color3.fromRGB(35, 42, 39)        -- สีเส้นขอบเริ่มต้น
 }
 
+local TextColorPresets = {
+	["Red"] = { Color = Color3.fromRGB(239, 68, 68), Stroke = false },
+	["Black"] = { Color = Color3.fromRGB(15, 15, 15), Stroke = false },
+	["White + Black Outline"] = { Color = Color3.fromRGB(255, 255, 255), Stroke = true },
+	["Green"] = { Color = Color3.fromRGB(34, 197, 94), Stroke = false },
+	["White"] = { Color = Color3.fromRGB(240, 245, 242), Stroke = false }
+}
+local TextColorOrder = { "Red", "Black", "White + Black Outline", "Green", "White" }
+
+local BorderColorPresets = {
+	["Red"] = Color3.fromRGB(239, 68, 68),
+	["Blue"] = Color3.fromRGB(59, 130, 246),
+	["Green"] = Color3.fromRGB(34, 197, 94),
+	["Black"] = Color3.fromRGB(5, 5, 5)
+}
+local BorderColorOrder = { "Red", "Blue", "Green", "Black" }
+
+-- แยกตัวแปรสำหรับคุมขนาดตัวหนังสือของฟังก์ชันโดยเฉพาะ (ไม่ปะปนกับ UIScale ของหน้าต่าง)
+local ManagedFeatureLabels = {}
+local ManagedStrokes = {}
+
+local targetUIScale = HubSettings.DefaultScale
+local targetFeatureTextSize = HubSettings.DefaultTextSize
+local currentFeatureTextSize = HubSettings.DefaultTextSize
+
+local function RegisterFeatureText(labelObj)
+	table.insert(ManagedFeatureLabels, labelObj)
+end
+
+local function RegisterBorderStroke(strokeObj)
+	table.insert(ManagedStrokes, strokeObj)
+end
+
+local function SetTargetFeatureTextSize(sizeVal)
+	targetFeatureTextSize = math.clamp(math.floor((tonumber(sizeVal) or HubSettings.DefaultTextSize) + 0.5), 1, 100)
+end
+
+local function ApplyTextColorPreset(presetName)
+	local preset = TextColorPresets[presetName] or TextColorPresets["White"]
+	for _, lbl in ipairs(ManagedFeatureLabels) do
+		if lbl and lbl.Parent then
+			lbl.TextColor3 = preset.Color
+			local existingStroke = lbl:FindFirstChild("FeatureTextOutline")
+			if preset.Stroke then
+				if not existingStroke then
+					existingStroke = Instance.new("UIStroke")
+					existingStroke.Name = "FeatureTextOutline"
+					existingStroke.Color = Color3.fromRGB(0, 0, 0)
+					existingStroke.Thickness = 1.2
+					existingStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+					existingStroke.Parent = lbl
+				else
+					existingStroke.Enabled = true
+				end
+			elseif existingStroke then
+				existingStroke.Enabled = false
+			end
+		end
+	end
+end
+
+local function ApplyBorderColorPreset(presetName)
+	local targetColor = BorderColorPresets[presetName] or Theme.Border
+	Theme.Border = targetColor
+	for _, stroke in ipairs(ManagedStrokes) do
+		if stroke and stroke.Parent then
+			stroke.Color = targetColor
+		end
+	end
+end
+
+-- สร้าง ScreenGui หลัก
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "FARTEZ_HUB_UI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = PlayerGui
 
--- ============================================
--- Black Screen Overlay (CPU/GPU Saver)
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 4: หน้าจอดำสำหรับโหมดประหยัดทรัพยากร (Black Screen)]
+-- ============================================================================
 local BlackScreenOverlay = Instance.new("Frame")
 BlackScreenOverlay.Name = "BlackScreenOverlay"
 BlackScreenOverlay.Size = UDim2.new(1, 0, 1, 0)
@@ -77,19 +177,19 @@ local BlackScreenText = Instance.new("TextLabel")
 BlackScreenText.Size = UDim2.new(1, 0, 0, 30)
 BlackScreenText.Position = UDim2.new(0, 0, 0.5, -15)
 BlackScreenText.BackgroundTransparency = 1
-BlackScreenText.Text = "FARTEZ HUB - Black Screen Mode Active (CPU/GPU Saver)"
+BlackScreenText.Text = HubSettings.HubName .. " - Black Screen Mode Active (CPU/GPU Saver)"
 BlackScreenText.TextColor3 = Theme.Green
 BlackScreenText.Font = Enum.Font.GothamBold
 BlackScreenText.TextSize = 14
 BlackScreenText.Parent = BlackScreenOverlay
 
--- ============================================
--- Floating Toggle Logo Button (Draggable)
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 5: ปุ่มโลโก้ลอยสำหรับเปิด/ปิดหน้าต่าง UI]
+-- ============================================================================
 local toggleBtn = Instance.new("ImageButton")
 toggleBtn.Name = "ToggleHubBtn"
 toggleBtn.Parent = ScreenGui
-toggleBtn.Image = "rbxthumb://type=Asset&id=117149073945265&w=150&h=150"
+toggleBtn.Image = HubSettings.LogoAssetId
 toggleBtn.Size = UDim2.new(0, 50, 0, 50)
 toggleBtn.Position = UDim2.new(0, 15, 0, 150)
 toggleBtn.BackgroundColor3 = Theme.Sidebar
@@ -101,9 +201,9 @@ local toggleStroke = Instance.new("UIStroke", toggleBtn)
 toggleStroke.Color = Theme.Green
 toggleStroke.Thickness = 1.5
 
--- ============================================
--- Main Window (Default Scale: 55%)
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 6: หน้าต่างหลัก (Main Window) และตัวปรับสเกล (UIScale)]
+-- ============================================================================
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 740, 0, 480)
@@ -116,52 +216,54 @@ MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 local mainStroke = Instance.new("UIStroke", MainFrame)
 mainStroke.Color = Theme.Border
-mainStroke.Thickness = 1
+mainStroke.Thickness = 1.5
+RegisterBorderStroke(mainStroke)
 
+-- UIScale อยู่เฉพาะบน MainFrame ไม่กระทบขนาดตัวอักษรโดยตรง
 local UIScale = Instance.new("UIScale")
-UIScale.Scale = 0.55
+UIScale.Scale = HubSettings.DefaultScale
 UIScale.Parent = MainFrame
 
--- Floating Toggle Button Drag & Click Handler
 do
-    local isDragging = false
-    local hasDragged = false
-    local dragStart, startPos
+	local isDragging = false
+	local hasDragged = false
+	local dragStart, startPos
 
-    toggleBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
-            hasDragged = false
-            dragStart = input.Position
-            startPos = toggleBtn.Position
-            TweenService:Create(toggleBtn, TweenInfo.new(0.15), {Size = UDim2.new(0, 46, 0, 46)}):Play()
-        end
-    end)
+	toggleBtn.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			isDragging = true
+			hasDragged = false
+			dragStart = input.Position
+			startPos = toggleBtn.Position
+			TweenService:Create(toggleBtn, TweenInfo.new(0.15), {Size = UDim2.new(0, 46, 0, 46)}):Play()
+		end
+	end)
 
-    UserInputService.InputChanged:Connect(function(input)
-        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            if delta.Magnitude > 5 then
-                hasDragged = true
-                toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            end
-        end
-    end)
+	UserInputService.InputChanged:Connect(function(input)
+		if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			if HubState.Toggles["LockToggleBtn"] then return end
+			local delta = input.Position - dragStart
+			if delta.Magnitude > 5 then
+				hasDragged = true
+				toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			end
+		end
+	end)
 
-    toggleBtn.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = false
-            TweenService:Create(toggleBtn, TweenInfo.new(0.15), {Size = UDim2.new(0, 50, 0, 50)}):Play()
-            if not hasDragged then
-                MainFrame.Visible = not MainFrame.Visible
-            end
-        end
-    end)
+	toggleBtn.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			isDragging = false
+			TweenService:Create(toggleBtn, TweenInfo.new(0.15), {Size = UDim2.new(0, 50, 0, 50)}):Play()
+			if not hasDragged then
+				MainFrame.Visible = not MainFrame.Visible
+			end
+		end
+	end)
 end
 
--- ============================================
--- Left Sidebar
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 7: แถบเมนูด้านซ้าย (Sidebar) + โลโก้ + โปรไฟล์ผู้เล่น]
+-- ============================================================================
 local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.Size = UDim2.new(0, 200, 1, 0)
@@ -193,7 +295,7 @@ TopBar.Parent = Sidebar
 local Logo = Instance.new("ImageLabel")
 Logo.Name = "Logo"
 Logo.Parent = TopBar
-Logo.Image = "rbxthumb://type=Asset&id=117149073945265&w=150&h=150"
+Logo.Image = HubSettings.LogoAssetId
 Logo.Size = UDim2.new(0, 36, 0, 36)
 Logo.Position = UDim2.new(0, 14, 0.5, -18)
 Logo.BackgroundColor3 = Theme.CardBg
@@ -204,7 +306,7 @@ local HubTitle = Instance.new("TextLabel")
 HubTitle.Size = UDim2.new(1, -60, 0, 20)
 HubTitle.Position = UDim2.new(0, 58, 0, 12)
 HubTitle.BackgroundTransparency = 1
-HubTitle.Text = "FARTEZ HUB"
+HubTitle.Text = HubSettings.HubName
 HubTitle.TextColor3 = Theme.Text
 HubTitle.Font = Enum.Font.GothamBold
 HubTitle.TextSize = 15
@@ -215,40 +317,43 @@ local HubVersion = Instance.new("TextLabel")
 HubVersion.Size = UDim2.new(1, -60, 0, 16)
 HubVersion.Position = UDim2.new(0, 58, 0, 32)
 HubVersion.BackgroundTransparency = 1
-HubVersion.Text = "Universal v1.5"
+HubVersion.Text = HubSettings.Version
 HubVersion.TextColor3 = Theme.Green
 HubVersion.Font = Enum.Font.GothamMedium
 HubVersion.TextSize = 12
 HubVersion.TextXAlignment = Enum.TextXAlignment.Left
 HubVersion.Parent = TopBar
 
--- Main Window Drag Handler
 do
-    local dragging, dragStart, startPos
-    TopBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
+	local dragging, dragStart, startPos
+	TopBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			if HubState.Toggles["LockUI"] then return end
+			dragging = true
+			dragStart = input.Position
+			startPos = MainFrame.Position
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			if HubState.Toggles["LockUI"] then
+				dragging = false
+				return
+			end
+			local delta = input.Position - dragStart
+			MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
 end
 
--- Player Profile Section (Censored Name: K*********)
 local function CensorName(name)
-    if #name <= 1 then return name .. "****" end
-    return string.sub(name, 1, 1) .. string.rep("*", math.max(7, #name - 1))
+	if #name <= 1 then return name .. "****" end
+	return string.sub(name, 1, 1) .. string.rep("*", math.max(7, #name - 1))
 end
 
 local ProfileFrame = Instance.new("Frame")
@@ -287,16 +392,16 @@ local StatusLbl = Instance.new("TextLabel")
 StatusLbl.Size = UDim2.new(1, -60, 0, 16)
 StatusLbl.Position = UDim2.new(0, 56, 0, 31)
 StatusLbl.BackgroundTransparency = 1
-StatusLbl.Text = "Expires: lifetime"
+StatusLbl.Text = "Expires: " .. HubSettings.KeyTimeText
 StatusLbl.TextColor3 = Theme.Green
 StatusLbl.Font = Enum.Font.GothamMedium
 StatusLbl.TextSize = 11
 StatusLbl.TextXAlignment = Enum.TextXAlignment.Left
 StatusLbl.Parent = ProfileFrame
 
--- ============================================
--- Right Content Area
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 8: พื้นที่แสดงเนื้อหาฝั่งขวา + ปุ่มซ่อน (—) + ปุ่มปิด (×) พร้อมแจ้งเตือน]
+-- ============================================================================
 local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -200, 1, 0)
 ContentArea.Position = UDim2.new(0, 200, 0, 0)
@@ -312,16 +417,13 @@ local PageTitle = Instance.new("TextLabel")
 PageTitle.Size = UDim2.new(0, 200, 1, 0)
 PageTitle.Position = UDim2.new(0, 20, 0, 0)
 PageTitle.BackgroundTransparency = 1
-PageTitle.Text = "Farm"
+PageTitle.Text = "Home"
 PageTitle.TextColor3 = Theme.Text
 PageTitle.Font = Enum.Font.GothamBold
 PageTitle.TextSize = 17
 PageTitle.TextXAlignment = Enum.TextXAlignment.Left
 PageTitle.Parent = HeaderBar
 
--- ============================================
--- Close Confirmation Dialog (Modal)
--- ============================================
 local ConfirmBackdrop = Instance.new("Frame")
 ConfirmBackdrop.Name = "ConfirmBackdrop"
 ConfirmBackdrop.Size = UDim2.new(1, 0, 1, 0)
@@ -344,12 +446,13 @@ Instance.new("UICorner", ConfirmDialog).CornerRadius = UDim.new(0, 12)
 local dialogStroke = Instance.new("UIStroke", ConfirmDialog)
 dialogStroke.Color = Theme.Border
 dialogStroke.Thickness = 1.5
+RegisterBorderStroke(dialogStroke)
 
 local DialogTitle = Instance.new("TextLabel")
 DialogTitle.Size = UDim2.new(1, -32, 0, 24)
 DialogTitle.Position = UDim2.new(0, 16, 0, 16)
 DialogTitle.BackgroundTransparency = 1
-DialogTitle.Text = "Close FARTEZ HUB?"
+DialogTitle.Text = "Close " .. HubSettings.HubName .. "?"
 DialogTitle.TextColor3 = Theme.Text
 DialogTitle.Font = Enum.Font.GothamBold
 DialogTitle.TextSize = 16
@@ -382,7 +485,9 @@ CancelCloseBtn.TextSize = 13
 CancelCloseBtn.ZIndex = 52
 CancelCloseBtn.Parent = ConfirmDialog
 Instance.new("UICorner", CancelCloseBtn).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", CancelCloseBtn).Color = Theme.Border
+local cancelStroke = Instance.new("UIStroke", CancelCloseBtn)
+cancelStroke.Color = Theme.Border
+RegisterBorderStroke(cancelStroke)
 
 local ConfirmCloseBtn = Instance.new("TextButton")
 ConfirmCloseBtn.Size = UDim2.new(0.45, 0, 0, 34)
@@ -397,16 +502,13 @@ ConfirmCloseBtn.Parent = ConfirmDialog
 Instance.new("UICorner", ConfirmCloseBtn).CornerRadius = UDim.new(0, 8)
 
 CancelCloseBtn.MouseButton1Click:Connect(function()
-    ConfirmBackdrop.Visible = false
+	ConfirmBackdrop.Visible = false
 end)
 
 ConfirmCloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
+	ScreenGui:Destroy()
 end)
 
--- ============================================
--- Top-Right Window Controls: Minimize (—) & Close (×)
--- ============================================
 local MinBtn = Instance.new("TextButton")
 MinBtn.Name = "MinimizeBtn"
 MinBtn.Size = UDim2.new(0, 32, 0, 32)
@@ -418,6 +520,7 @@ MinBtn.Parent = HeaderBar
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 8)
 local minStroke = Instance.new("UIStroke", MinBtn)
 minStroke.Color = Theme.Border
+RegisterBorderStroke(minStroke)
 
 local MinLine = Instance.new("Frame")
 MinLine.Size = UDim2.new(0, 12, 0, 2)
@@ -429,15 +532,15 @@ MinLine.Parent = MinBtn
 Instance.new("UICorner", MinLine).CornerRadius = UDim.new(1, 0)
 
 MinBtn.MouseEnter:Connect(function()
-    TweenService:Create(MinBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.ElementBg}):Play()
-    TweenService:Create(MinLine, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Green}):Play()
+	TweenService:Create(MinBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.ElementBg}):Play()
+	TweenService:Create(MinLine, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Green}):Play()
 end)
 MinBtn.MouseLeave:Connect(function()
-    TweenService:Create(MinBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.CardBg}):Play()
-    TweenService:Create(MinLine, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Text}):Play()
+	TweenService:Create(MinBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.CardBg}):Play()
+	TweenService:Create(MinLine, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Text}):Play()
 end)
 MinBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
+	MainFrame.Visible = false
 end)
 
 local CloseBtn = Instance.new("TextButton")
@@ -454,20 +557,21 @@ CloseBtn.Parent = HeaderBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
 local closeStroke = Instance.new("UIStroke", CloseBtn)
 closeStroke.Color = Theme.Border
+RegisterBorderStroke(closeStroke)
 
 CloseBtn.MouseEnter:Connect(function()
-    TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Red}):Play()
+	TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.Red}):Play()
 end)
 CloseBtn.MouseLeave:Connect(function()
-    TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.CardBg}):Play()
+	TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.CardBg}):Play()
 end)
 CloseBtn.MouseButton1Click:Connect(function()
-    ConfirmBackdrop.Visible = true
+	ConfirmBackdrop.Visible = true
 end)
 
--- ============================================
--- Tabs System
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 9: ระบบสร้างแท็บและตัวช่วยสร้างปุ่ม/การ์ด (UI Builder Functions)]
+-- ============================================================================
 local TabButtonsContainer = Instance.new("Frame")
 TabButtonsContainer.Size = UDim2.new(1, 0, 1, -130)
 TabButtonsContainer.Position = UDim2.new(0, 0, 0, 68)
@@ -483,581 +587,1191 @@ local Pages = {}
 local TabButtons = {}
 
 local function AddCategoryLabel(text)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -28, 0, 20)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = "   " .. text
-    lbl.TextColor3 = Theme.SubText
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 11
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = TabButtonsContainer
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -28, 0, 20)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = "   " .. text
+	lbl.TextColor3 = Theme.SubText
+	lbl.Font = Enum.Font.GothamBold
+	lbl.TextSize = 11
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = TabButtonsContainer
 end
 
 local function CreateTab(tabName, iconText)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -16, 0, 34)
-    btn.BackgroundColor3 = Theme.CardBg
-    btn.BackgroundTransparency = 1
-    btn.Text = ""
-    btn.AutoButtonColor = false
-    btn.Parent = TabButtonsContainer
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -16, 0, 34)
+	btn.BackgroundColor3 = Theme.CardBg
+	btn.BackgroundTransparency = 1
+	btn.Text = ""
+	btn.AutoButtonColor = false
+	btn.Parent = TabButtonsContainer
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
 
-    local indicator = Instance.new("Frame")
-    indicator.Name = "Indicator"
-    indicator.Size = UDim2.new(0, 3, 0, 18)
-    indicator.Position = UDim2.new(0, 4, 0.5, -9)
-    indicator.BackgroundColor3 = Theme.Green
-    indicator.BorderSizePixel = 0
-    indicator.Visible = false
-    indicator.Parent = btn
-    Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
+	local indicator = Instance.new("Frame")
+	indicator.Name = "Indicator"
+	indicator.Size = UDim2.new(0, 3, 0, 18)
+	indicator.Position = UDim2.new(0, 4, 0.5, -9)
+	indicator.BackgroundColor3 = Theme.Green
+	indicator.BorderSizePixel = 0
+	indicator.Visible = false
+	indicator.Parent = btn
+	Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
 
-    local lbl = Instance.new("TextLabel")
-    lbl.Name = "Label"
-    lbl.Size = UDim2.new(1, -25, 1, 0)
-    lbl.Position = UDim2.new(0, 18, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = iconText .. "   " .. tabName
-    lbl.TextColor3 = Theme.SubText
-    lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 13
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = btn
+	local lbl = Instance.new("TextLabel")
+	lbl.Name = "Label"
+	lbl.Size = UDim2.new(1, -25, 1, 0)
+	lbl.Position = UDim2.new(0, 18, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = iconText .. "   " .. tabName
+	lbl.TextColor3 = Theme.SubText
+	lbl.Font = Enum.Font.GothamMedium
+	lbl.TextSize = 13
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = btn
 
-    local page = Instance.new("ScrollingFrame")
-    page.Name = tabName .. "_Page"
-    page.Size = UDim2.new(1, -30, 1, -65)
-    page.Position = UDim2.new(0, 15, 0, 55)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.ScrollBarThickness = 3
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.CanvasSize = UDim2.new(0, 0, 0, 0)
-    page.Visible = false
-    page.Parent = ContentArea
+	local page = Instance.new("ScrollingFrame")
+	page.Name = tabName .. "_Page"
+	page.Size = UDim2.new(1, -30, 1, -65)
+	page.Position = UDim2.new(0, 15, 0, 55)
+	page.BackgroundTransparency = 1
+	page.BorderSizePixel = 0
+	page.ScrollBarThickness = 3
+	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	page.CanvasSize = UDim2.new(0, 0, 0, 0)
+	page.Visible = false
+	page.Parent = ContentArea
 
-    local LeftCol = Instance.new("Frame")
-    LeftCol.Name = "LeftCol"
-    LeftCol.Size = UDim2.new(0.49, 0, 0, 0)
-    LeftCol.AutomaticSize = Enum.AutomaticSize.Y
-    LeftCol.BackgroundTransparency = 1
-    LeftCol.Parent = page
-    local LLayout = Instance.new("UIListLayout", LeftCol)
-    LLayout.Padding = UDim.new(0, 12)
+	local LeftCol = Instance.new("Frame")
+	LeftCol.Name = "LeftCol"
+	LeftCol.Size = UDim2.new(0.49, 0, 0, 0)
+	LeftCol.AutomaticSize = Enum.AutomaticSize.Y
+	LeftCol.BackgroundTransparency = 1
+	LeftCol.Parent = page
+	local LLayout = Instance.new("UIListLayout", LeftCol)
+	LLayout.Padding = UDim.new(0, 12)
 
-    local RightCol = Instance.new("Frame")
-    RightCol.Name = "RightCol"
-    RightCol.Size = UDim2.new(0.49, 0, 0, 0)
-    RightCol.Position = UDim2.new(0.51, 0, 0, 0)
-    RightCol.AutomaticSize = Enum.AutomaticSize.Y
-    RightCol.BackgroundTransparency = 1
-    RightCol.Parent = page
-    local RLayout = Instance.new("UIListLayout", RightCol)
-    RLayout.Padding = UDim.new(0, 12)
+	local RightCol = Instance.new("Frame")
+	RightCol.Name = "RightCol"
+	RightCol.Size = UDim2.new(0.49, 0, 0, 0)
+	RightCol.Position = UDim2.new(0.51, 0, 0, 0)
+	RightCol.AutomaticSize = Enum.AutomaticSize.Y
+	RightCol.BackgroundTransparency = 1
+	RightCol.Parent = page
+	local RLayout = Instance.new("UIListLayout", RightCol)
+	RLayout.Padding = UDim.new(0, 12)
 
-    Pages[tabName] = { Page = page, Left = LeftCol, Right = RightCol }
-    TabButtons[tabName] = { Btn = btn, Indicator = indicator, Label = lbl }
+	Pages[tabName] = { Page = page, Left = LeftCol, Right = RightCol }
+	TabButtons[tabName] = { Btn = btn, Indicator = indicator, Label = lbl }
 
-    btn.MouseButton1Click:Connect(function()
-        for name, data in pairs(Pages) do
-            data.Page.Visible = (name == tabName)
-        end
-        for name, tData in pairs(TabButtons) do
-            local active = (name == tabName)
-            tData.Indicator.Visible = active
-            TweenService:Create(tData.Label, TweenInfo.new(0.2), {TextColor3 = active and Theme.Text or Theme.SubText}):Play()
-            TweenService:Create(tData.Btn, TweenInfo.new(0.2), {BackgroundTransparency = active and 0.4 or 1}):Play()
-        end
-        PageTitle.Text = tabName
-    end)
+	btn.MouseButton1Click:Connect(function()
+		for name, data in pairs(Pages) do
+			data.Page.Visible = (name == tabName)
+		end
+		for name, tData in pairs(TabButtons) do
+			local active = (name == tabName)
+			tData.Indicator.Visible = active
+			TweenService:Create(tData.Label, TweenInfo.new(0.2), {TextColor3 = active and Theme.Text or Theme.SubText}):Play()
+			TweenService:Create(tData.Btn, TweenInfo.new(0.2), {BackgroundTransparency = active and 0.4 or 1}):Play()
+		end
+		PageTitle.Text = tabName
+	end)
 
-    return Pages[tabName]
+	return Pages[tabName]
 end
 
--- ============================================
--- UI Components
--- ============================================
 local function CreateCard(parentCol, titleText, iconText, defaultExpanded)
-    local isExpanded = (defaultExpanded ~= false)
+	local isExpanded = (defaultExpanded ~= false)
 
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 50)
-    card.AutomaticSize = Enum.AutomaticSize.Y
-    card.BackgroundColor3 = Theme.CardBg
-    card.BorderSizePixel = 0
-    card.Parent = parentCol
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
-    local cStroke = Instance.new("UIStroke", card)
-    cStroke.Color = Theme.Border
+	local card = Instance.new("Frame")
+	card.Size = UDim2.new(1, 0, 0, 50)
+	card.AutomaticSize = Enum.AutomaticSize.Y
+	card.BackgroundColor3 = Theme.CardBg
+	card.BorderSizePixel = 0
+	card.Parent = parentCol
+	Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+	local cStroke = Instance.new("UIStroke", card)
+	cStroke.Color = Theme.Border
+	RegisterBorderStroke(cStroke)
 
-    local pad = Instance.new("UIPadding", card)
-    pad.PaddingTop = UDim.new(0, 12)
-    pad.PaddingBottom = UDim.new(0, 12)
-    pad.PaddingLeft = UDim.new(0, 14)
-    pad.PaddingRight = UDim.new(0, 14)
+	local pad = Instance.new("UIPadding", card)
+	pad.PaddingTop = UDim.new(0, 12)
+	pad.PaddingBottom = UDim.new(0, 12)
+	pad.PaddingLeft = UDim.new(0, 14)
+	pad.PaddingRight = UDim.new(0, 14)
 
-    local mainList = Instance.new("UIListLayout", card)
-    mainList.Padding = UDim.new(0, 10)
-    mainList.SortOrder = Enum.SortOrder.LayoutOrder
+	local mainList = Instance.new("UIListLayout", card)
+	mainList.Padding = UDim.new(0, 10)
+	mainList.SortOrder = Enum.SortOrder.LayoutOrder
 
-    local headerBtn = Instance.new("TextButton")
-    headerBtn.Size = UDim2.new(1, 0, 0, 26)
-    headerBtn.BackgroundTransparency = 1
-    headerBtn.Text = ""
-    headerBtn.LayoutOrder = 1
-    headerBtn.Parent = card
+	local headerBtn = Instance.new("TextButton")
+	headerBtn.Size = UDim2.new(1, 0, 0, 26)
+	headerBtn.BackgroundTransparency = 1
+	headerBtn.Text = ""
+	headerBtn.LayoutOrder = 1
+	headerBtn.Parent = card
 
-    local iconBg = Instance.new("Frame")
-    iconBg.Size = UDim2.new(0, 26, 0, 26)
-    iconBg.BackgroundColor3 = Theme.GreenDark
-    iconBg.Parent = headerBtn
-    Instance.new("UICorner", iconBg).CornerRadius = UDim.new(0, 6)
+	local iconBg = Instance.new("Frame")
+	iconBg.Size = UDim2.new(0, 26, 0, 26)
+	iconBg.BackgroundColor3 = Theme.GreenDark
+	iconBg.Parent = headerBtn
+	Instance.new("UICorner", iconBg).CornerRadius = UDim.new(0, 6)
 
-    local iconLbl = Instance.new("TextLabel")
-    iconLbl.Size = UDim2.new(1, 0, 1, 0)
-    iconLbl.BackgroundTransparency = 1
-    iconLbl.Text = iconText
-    iconLbl.TextColor3 = Theme.Green
-    iconLbl.Font = Enum.Font.GothamBold
-    iconLbl.TextSize = 13
-    iconLbl.Parent = iconBg
+	local iconLbl = Instance.new("TextLabel")
+	iconLbl.Size = UDim2.new(1, 0, 1, 0)
+	iconLbl.BackgroundTransparency = 1
+	iconLbl.Text = iconText
+	iconLbl.TextColor3 = Theme.Green
+	iconLbl.Font = Enum.Font.GothamBold
+	iconLbl.TextSize = 13
+	iconLbl.Parent = iconBg
 
-    local titleLbl = Instance.new("TextLabel")
-    titleLbl.Size = UDim2.new(1, -65, 1, 0)
-    titleLbl.Position = UDim2.new(0, 36, 0, 0)
-    titleLbl.BackgroundTransparency = 1
-    titleLbl.Text = titleText
-    titleLbl.TextColor3 = Theme.Text
-    titleLbl.Font = Enum.Font.GothamBold
-    titleLbl.TextSize = 14
-    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-    titleLbl.Parent = headerBtn
+	local titleLbl = Instance.new("TextLabel")
+	titleLbl.Size = UDim2.new(1, -65, 1, 0)
+	titleLbl.Position = UDim2.new(0, 36, 0, 0)
+	titleLbl.BackgroundTransparency = 1
+	titleLbl.Text = titleText
+	titleLbl.TextColor3 = Theme.Text
+	titleLbl.Font = Enum.Font.GothamBold
+	titleLbl.TextSize = 14
+	titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+	titleLbl.Parent = headerBtn
 
-    local arrowLbl = Instance.new("TextLabel")
-    arrowLbl.Size = UDim2.new(0, 24, 1, 0)
-    arrowLbl.Position = UDim2.new(1, -24, 0, 0)
-    arrowLbl.BackgroundTransparency = 1
-    arrowLbl.Text = isExpanded and "▼" or "▶"
-    arrowLbl.TextColor3 = isExpanded and Theme.Green or Theme.SubText
-    arrowLbl.Font = Enum.Font.GothamBold
-    arrowLbl.TextSize = 12
-    arrowLbl.Parent = headerBtn
+	local arrowLbl = Instance.new("TextLabel")
+	arrowLbl.Size = UDim2.new(0, 24, 1, 0)
+	arrowLbl.Position = UDim2.new(1, -24, 0, 0)
+	arrowLbl.BackgroundTransparency = 1
+	arrowLbl.Text = isExpanded and "▼" or "▶"
+	arrowLbl.TextColor3 = isExpanded and Theme.Green or Theme.SubText
+	arrowLbl.Font = Enum.Font.GothamBold
+	arrowLbl.TextSize = 12
+	arrowLbl.Parent = headerBtn
 
-    local contentContainer = Instance.new("Frame")
-    contentContainer.Name = "ContentContainer"
-    contentContainer.Size = UDim2.new(1, 0, 0, 0)
-    contentContainer.AutomaticSize = Enum.AutomaticSize.Y
-    contentContainer.BackgroundTransparency = 1
-    contentContainer.Visible = isExpanded
-    contentContainer.LayoutOrder = 2
-    contentContainer.Parent = card
+	local contentContainer = Instance.new("Frame")
+	contentContainer.Name = "ContentContainer"
+	contentContainer.Size = UDim2.new(1, 0, 0, 0)
+	contentContainer.AutomaticSize = Enum.AutomaticSize.Y
+	contentContainer.BackgroundTransparency = 1
+	contentContainer.Visible = isExpanded
+	contentContainer.LayoutOrder = 2
+	contentContainer.Parent = card
 
-    local contentList = Instance.new("UIListLayout", contentContainer)
-    contentList.Padding = UDim.new(0, 10)
-    contentList.SortOrder = Enum.SortOrder.LayoutOrder
+	local contentList = Instance.new("UIListLayout", contentContainer)
+	contentList.Padding = UDim.new(0, 10)
+	contentList.SortOrder = Enum.SortOrder.LayoutOrder
 
-    headerBtn.MouseButton1Click:Connect(function()
-        isExpanded = not isExpanded
-        contentContainer.Visible = isExpanded
-        arrowLbl.Text = isExpanded and "▼" or "▶"
-        TweenService:Create(arrowLbl, TweenInfo.new(0.2), {
-            TextColor3 = isExpanded and Theme.Green or Theme.SubText
-        }):Play()
-    end)
+	headerBtn.MouseButton1Click:Connect(function()
+		isExpanded = not isExpanded
+		contentContainer.Visible = isExpanded
+		arrowLbl.Text = isExpanded and "▼" or "▶"
+		TweenService:Create(arrowLbl, TweenInfo.new(0.2), {
+			TextColor3 = isExpanded and Theme.Green or Theme.SubText
+		}):Play()
+	end)
 
-    return contentContainer
+	return contentContainer
 end
 
 local function AddToggle(container, flagKey, text, default, callback)
-    HubState.Toggles[flagKey] = default
+	HubState.Toggles[flagKey] = default
 
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 24)
-    row.BackgroundTransparency = 1
-    row.Parent = container
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 26)
+	row.BackgroundTransparency = 1
+	row.Parent = container
 
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -50, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Theme.Text
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = row
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -50, 1, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = text
+	lbl.TextColor3 = Theme.Text
+	lbl.Font = Enum.Font.Gotham
+	lbl.TextSize = HubSettings.DefaultTextSize
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.TextTruncate = Enum.TextTruncate.AtEnd
+	lbl.Parent = row
+	RegisterFeatureText(lbl)
 
-    local switchBg = Instance.new("TextButton")
-    switchBg.Size = UDim2.new(0, 40, 0, 20)
-    switchBg.Position = UDim2.new(1, -40, 0.5, -10)
-    switchBg.BackgroundColor3 = default and Theme.Green or Theme.ElementBg
-    switchBg.Text = ""
-    switchBg.AutoButtonColor = false
-    switchBg.Parent = row
-    Instance.new("UICorner", switchBg).CornerRadius = UDim.new(1, 0)
+	local switchBg = Instance.new("TextButton")
+	switchBg.Size = UDim2.new(0, 40, 0, 20)
+	switchBg.Position = UDim2.new(1, -40, 0.5, -10)
+	switchBg.BackgroundColor3 = default and Theme.Green or Theme.ElementBg
+	switchBg.Text = ""
+	switchBg.AutoButtonColor = false
+	switchBg.Parent = row
+	Instance.new("UICorner", switchBg).CornerRadius = UDim.new(1, 0)
 
-    local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 14, 0, 14)
-    knob.Position = default and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    knob.Parent = switchBg
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 14, 0, 14)
+	knob.Position = default and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	knob.Parent = switchBg
+	Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
-    local function SetState(newState, runCallback)
-        HubState.Toggles[flagKey] = newState
-        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        TweenService:Create(switchBg, tweenInfo, {
-            BackgroundColor3 = newState and Theme.Green or Theme.ElementBg
-        }):Play()
-        TweenService:Create(knob, tweenInfo, {
-            Position = newState and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-        }):Play()
-        if runCallback and callback then callback(newState) end
-    end
+	local function SetState(newState, runCallback)
+		HubState.Toggles[flagKey] = newState
+		local tweenInfo = TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		TweenService:Create(switchBg, tweenInfo, {
+			BackgroundColor3 = newState and Theme.Green or Theme.ElementBg
+		}):Play()
+		TweenService:Create(knob, tweenInfo, {
+			Position = newState and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+		}):Play()
+		if runCallback and callback then callback(newState) end
+	end
 
-    HubState.ToggleSetters[flagKey] = function(val) SetState(val, true) end
+	HubState.ToggleSetters[flagKey] = function(val) SetState(val, true) end
 
-    switchBg.MouseButton1Click:Connect(function()
-        SetState(not HubState.Toggles[flagKey], true)
-    end)
+	switchBg.MouseButton1Click:Connect(function()
+		SetState(not HubState.Toggles[flagKey], true)
+	end)
 
-    if default and callback then
-        task.spawn(function() callback(true) end)
-    end
+	if default and callback then
+		task.spawn(function() callback(true) end)
+	end
 end
 
+-- สไลเดอร์แบบลื่นไหล (อัปเดตตัวเลขและปุ่มเลื่อนทันทีโดยไม่หน่วงค้าง)
 local function AddSmoothSlider(container, flagKey, text, minVal, maxVal, defaultVal, suffix, callback)
-    HubState.Sliders[flagKey] = defaultVal
+	HubState.Sliders[flagKey] = defaultVal
 
-    local box = Instance.new("Frame")
-    box.Size = UDim2.new(1, 0, 0, 46)
-    box.BackgroundTransparency = 1
-    box.Parent = container
+	local box = Instance.new("Frame")
+	box.Size = UDim2.new(1, 0, 0, 48)
+	box.BackgroundTransparency = 1
+	box.Parent = container
 
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -68, 0, 22)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = Theme.Text
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = box
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, -68, 0, 22)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = text
+	lbl.TextColor3 = Theme.Text
+	lbl.Font = Enum.Font.Gotham
+	lbl.TextSize = HubSettings.DefaultTextSize
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.TextTruncate = Enum.TextTruncate.AtEnd
+	lbl.Parent = box
+	RegisterFeatureText(lbl)
 
-    local valInput = Instance.new("TextBox")
-    valInput.Size = UDim2.new(0, 56, 0, 22)
-    valInput.Position = UDim2.new(1, -56, 0, 0)
-    valInput.BackgroundColor3 = Theme.ElementBg
-    valInput.Text = tostring(defaultVal) .. (suffix or "")
-    valInput.TextColor3 = Theme.Green
-    valInput.Font = Enum.Font.GothamBold
-    valInput.TextSize = 12
-    valInput.ClearTextOnFocus = false
-    valInput.Parent = box
-    Instance.new("UICorner", valInput).CornerRadius = UDim.new(0, 6)
-    Instance.new("UIStroke", valInput).Color = Theme.Border
+	local valInput = Instance.new("TextBox")
+	valInput.Size = UDim2.new(0, 56, 0, 22)
+	valInput.Position = UDim2.new(1, -56, 0, 0)
+	valInput.BackgroundColor3 = Theme.ElementBg
+	valInput.Text = tostring(defaultVal) .. (suffix or "")
+	valInput.TextColor3 = Theme.Green
+	valInput.Font = Enum.Font.GothamBold
+	valInput.TextSize = 12
+	valInput.ClearTextOnFocus = false
+	valInput.Parent = box
+	Instance.new("UICorner", valInput).CornerRadius = UDim.new(0, 6)
+	local valStroke = Instance.new("UIStroke", valInput)
+	valStroke.Color = Theme.Border
+	RegisterBorderStroke(valStroke)
 
-    local hitArea = Instance.new("TextButton")
-    hitArea.Size = UDim2.new(1, 0, 0, 20)
-    hitArea.Position = UDim2.new(0, 0, 0, 24)
-    hitArea.BackgroundTransparency = 1
-    hitArea.Text = ""
-    hitArea.AutoButtonColor = false
-    hitArea.Parent = box
+	local hitArea = Instance.new("TextButton")
+	hitArea.Size = UDim2.new(1, 0, 0, 22)
+	hitArea.Position = UDim2.new(0, 0, 0, 24)
+	hitArea.BackgroundTransparency = 1
+	hitArea.Text = ""
+	hitArea.AutoButtonColor = false
+	hitArea.Parent = box
 
-    local track = Instance.new("Frame")
-    track.Size = UDim2.new(1, 0, 0, 6)
-    track.Position = UDim2.new(0, 0, 0.5, -3)
-    track.BackgroundColor3 = Theme.ElementBg
-    track.BorderSizePixel = 0
-    track.Parent = hitArea
-    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(1, 0, 0, 6)
+	track.Position = UDim2.new(0, 0, 0.5, -3)
+	track.BackgroundColor3 = Theme.ElementBg
+	track.BorderSizePixel = 0
+	track.Parent = hitArea
+	Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
-    local initPct = math.clamp((defaultVal - minVal) / (maxVal - minVal), 0, 1)
+	local initPct = math.clamp((defaultVal - minVal) / (maxVal - minVal), 0, 1)
 
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new(initPct, 0, 1, 0)
-    fill.BackgroundColor3 = Theme.Green
-    fill.BorderSizePixel = 0
-    fill.Parent = track
-    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new(initPct, 0, 1, 0)
+	fill.BackgroundColor3 = Theme.Green
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+	Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 
-    local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 14, 0, 14)
-    knob.AnchorPoint = Vector2.new(0.5, 0.5)
-    knob.Position = UDim2.new(initPct, 0, 0.5, 0)
-    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    knob.Parent = track
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 15, 0, 15)
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.Position = UDim2.new(initPct, 0, 0.5, 0)
+	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	knob.Parent = track
+	Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
-    local sliding = false
+	local sliding = false
 
-    local function SetValue(newVal, smooth)
-        newVal = math.clamp(math.floor(newVal + 0.5), minVal, maxVal)
-        HubState.Sliders[flagKey] = newVal
-        local pct = (newVal - minVal) / (maxVal - minVal)
-        valInput.Text = tostring(newVal) .. (suffix or "")
+	local function SetValue(newVal, animate)
+		newVal = math.clamp(math.floor(newVal + 0.5), minVal, maxVal)
+		HubState.Sliders[flagKey] = newVal
+		local pct = (newVal - minVal) / (maxVal - minVal)
+		valInput.Text = tostring(newVal) .. (suffix or "")
 
-        local tInfo = smooth and TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out) or TweenInfo.new(0.06, Enum.EasingStyle.Linear)
-        TweenService:Create(fill, tInfo, {Size = UDim2.new(pct, 0, 1, 0)}):Play()
-        TweenService:Create(knob, tInfo, {Position = UDim2.new(pct, 0, 0.5, 0)}):Play()
+		if animate then
+			local tInfo = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+			TweenService:Create(fill, tInfo, {Size = UDim2.new(pct, 0, 1, 0)}):Play()
+			TweenService:Create(knob, tInfo, {Position = UDim2.new(pct, 0, 0.5, 0)}):Play()
+		else
+			fill.Size = UDim2.new(pct, 0, 1, 0)
+			knob.Position = UDim2.new(pct, 0, 0.5, 0)
+		end
 
-        if callback then callback(newVal) end
-    end
+		if callback then callback(newVal) end
+	end
 
-    HubState.SliderSetters[flagKey] = function(val) SetValue(val, true) end
+	HubState.SliderSetters[flagKey] = function(val) SetValue(val, true) end
 
-    local function UpdateFromInput(x)
-        if track.AbsoluteSize.X <= 0 then return end
-        local rel = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-        SetValue(minVal + (maxVal - minVal) * rel, false)
-    end
+	local function UpdateFromInput(x)
+		if track.AbsoluteSize.X <= 0 then return end
+		local rel = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		SetValue(minVal + (maxVal - minVal) * rel, false)
+	end
 
-    hitArea.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            sliding = true
-            TweenService:Create(knob, TweenInfo.new(0.12), {Size = UDim2.new(0, 17, 0, 17)}):Play()
-            UpdateFromInput(input.Position.X)
-        end
-    end)
+	hitArea.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			sliding = true
+			knob.Size = UDim2.new(0, 18, 0, 18)
+			UpdateFromInput(input.Position.X)
+		end
+	end)
 
-    UserInputService.InputEnded:Connect(function(input)
-        if sliding and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            sliding = false
-            TweenService:Create(knob, TweenInfo.new(0.12), {Size = UDim2.new(0, 14, 0, 14)}):Play()
-        end
-    end)
+	UserInputService.InputEnded:Connect(function(input)
+		if sliding and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+			sliding = false
+			knob.Size = UDim2.new(0, 15, 0, 15)
+		end
+	end)
 
-    UserInputService.InputChanged:Connect(function(input)
-        if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            UpdateFromInput(input.Position.X)
-        end
-    end)
+	UserInputService.InputChanged:Connect(function(input)
+		if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			UpdateFromInput(input.Position.X)
+		end
+	end)
 
-    valInput.FocusLost:Connect(function()
-        local num = tonumber(valInput.Text:match("%d+"))
-        if num then
-            SetValue(num, true)
-        else
-            valInput.Text = tostring(HubState.Sliders[flagKey]) .. (suffix or "")
-        end
-    end)
+	valInput.FocusLost:Connect(function()
+		local num = tonumber(valInput.Text:match("%d+"))
+		if num then
+			SetValue(num, true)
+		else
+			valInput.Text = tostring(HubState.Sliders[flagKey]) .. (suffix or "")
+		end
+	end)
 end
 
 local function AddButton(container, text, textColor, callback)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 32)
-    btn.BackgroundColor3 = Theme.ElementBg
-    btn.Text = text
-    btn.TextColor3 = textColor or Theme.Text
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 13
-    btn.Parent = container
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    Instance.new("UIStroke", btn).Color = Theme.Border
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 0, 32)
+	btn.BackgroundColor3 = Theme.ElementBg
+	btn.Text = text
+	btn.TextColor3 = textColor or Theme.Text
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 13
+	btn.Parent = container
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	local bStroke = Instance.new("UIStroke", btn)
+	bStroke.Color = Theme.Border
+	RegisterBorderStroke(bStroke)
 
-    btn.MouseButton1Click:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.08), {BackgroundColor3 = Theme.GreenDark}):Play()
-        task.delay(0.1, function()
-            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.ElementBg}):Play()
-        end)
-        if callback then callback() end
-    end)
-    return btn
+	btn.MouseButton1Click:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.08), {BackgroundColor3 = Theme.GreenDark}):Play()
+		task.delay(0.1, function()
+			TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.ElementBg}):Play()
+		end)
+		if callback then callback() end
+	end)
+	return btn
+end
+
+local function AddOptionSelector(container, flagKey, labelTitle, optionsList, defaultOption, callback)
+	local currentIdx = 1
+	for i, opt in ipairs(optionsList) do
+		if opt == defaultOption then
+			currentIdx = i
+			break
+		end
+	end
+	local selectedVal = optionsList[currentIdx]
+	HubState.Dropdowns[flagKey] = selectedVal
+
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.new(1, 0, 0, 52)
+	holder.BackgroundTransparency = 1
+	holder.Parent = container
+
+	local titleLbl = Instance.new("TextLabel")
+	titleLbl.Size = UDim2.new(1, 0, 0, 18)
+	titleLbl.BackgroundTransparency = 1
+	titleLbl.Text = labelTitle
+	titleLbl.TextColor3 = Theme.Text
+	titleLbl.Font = Enum.Font.Gotham
+	titleLbl.TextSize = HubSettings.DefaultTextSize
+	titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+	titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
+	titleLbl.Parent = holder
+	RegisterFeatureText(titleLbl)
+
+	local selBtn = Instance.new("TextButton")
+	selBtn.Size = UDim2.new(1, 0, 0, 30)
+	selBtn.Position = UDim2.new(0, 0, 0, 22)
+	selBtn.BackgroundColor3 = Theme.ElementBg
+	selBtn.Text = selectedVal .. "  [Click to Cycle]"
+	selBtn.TextColor3 = Theme.Green
+	selBtn.Font = Enum.Font.GothamBold
+	selBtn.TextSize = 12
+	selBtn.Parent = holder
+	Instance.new("UICorner", selBtn).CornerRadius = UDim.new(0, 8)
+	local sStroke = Instance.new("UIStroke", selBtn)
+	sStroke.Color = Theme.Border
+	RegisterBorderStroke(sStroke)
+
+	local function SelectOption(optName, runCb)
+		for i, opt in ipairs(optionsList) do
+			if opt == optName then
+				currentIdx = i
+				break
+			end
+		end
+		selectedVal = optionsList[currentIdx]
+		HubState.Dropdowns[flagKey] = selectedVal
+		selBtn.Text = selectedVal .. "  [Click to Cycle]"
+		if runCb and callback then callback(selectedVal) end
+	end
+
+	HubState.DropdownSetters[flagKey] = function(val)
+		SelectOption(val, true)
+	end
+
+	selBtn.MouseButton1Click:Connect(function()
+		currentIdx = currentIdx + 1
+		if currentIdx > #optionsList then
+			currentIdx = 1
+		end
+		SelectOption(optionsList[currentIdx], true)
+	end)
+
+	return selBtn
 end
 
 local function AddLabel(container, text, color)
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, 0, 0, 18)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = color or Theme.SubText
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 12
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextTruncate = Enum.TextTruncate.AtEnd
-    lbl.Parent = container
-    return lbl
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(1, 0, 0, 18)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = text
+	lbl.TextColor3 = color or Theme.SubText
+	lbl.Font = Enum.Font.Gotham
+	lbl.TextSize = 12
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.TextTruncate = Enum.TextTruncate.AtEnd
+	lbl.Parent = container
+	return lbl
 end
 
--- ============================================
--- Extreme FPS Boost (Lowest Graphics + Strip Details)
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 10: ระบบฟังก์ชัน Universal ของ Players Tab (ใช้ได้ทุกเกม)]
+-- ============================================================================
+local defaultWalkSpeed = 16
+local savedOriginalHitboxes = {}
+local espFolder = Instance.new("Folder")
+espFolder.Name = "FARTEZ_PlayerESP_Folder"
+espFolder.Parent = ScreenGui
+
+local function SyncWalkSpeed()
+	local char = LocalPlayer.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+
+	if HubState.Toggles["SpeedToggle"] then
+		local targetSpeed = tonumber(HubState.Sliders["SpeedValue"]) or 16
+		hum.WalkSpeed = math.clamp(targetSpeed, 1, 1000)
+	else
+		hum.WalkSpeed = defaultWalkSpeed
+	end
+end
+
+local function RestoreAllHitboxes()
+	for plr, origData in pairs(savedOriginalHitboxes) do
+		pcall(function()
+			if plr and plr.Character then
+				local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+				if hrp and origData then
+					hrp.Size = origData.Size
+					hrp.Transparency = origData.Transparency
+					hrp.CanCollide = origData.CanCollide
+				end
+			end
+		end)
+	end
+	savedOriginalHitboxes = {}
+end
+
+local function UpdatePlayerHitboxes()
+	if not HubState.Toggles["HitboxToggle"] then
+		RestoreAllHitboxes()
+		return
+	end
+
+	local sizeVal = math.clamp(tonumber(HubState.Sliders["HitboxSize"]) or 10, 1, 100)
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character then
+			local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				if not savedOriginalHitboxes[plr] then
+					savedOriginalHitboxes[plr] = {
+						Size = hrp.Size,
+						Transparency = hrp.Transparency,
+						CanCollide = hrp.CanCollide
+					}
+				end
+				hrp.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
+				hrp.Transparency = 0.75
+				hrp.CanCollide = false
+			end
+		end
+	end
+end
+
+local function ClearAllESP()
+	for _, item in ipairs(espFolder:GetChildren()) do
+		item:Destroy()
+	end
+end
+
+local function CreateESPForPlayer(plr)
+	if plr == LocalPlayer then return end
+	local existing = espFolder:FindFirstChild("ESP_" .. plr.UserId)
+	if existing then existing:Destroy() end
+
+	local container = Instance.new("Folder")
+	container.Name = "ESP_" .. plr.UserId
+	container.Parent = espFolder
+
+	local function AttachToCharacter(char)
+		if not HubState.Toggles["PlayerESP"] or not char then return end
+		task.spawn(function()
+			local root = char:WaitForChild("HumanoidRootPart", 5)
+			local head = char:WaitForChild("Head", 5)
+			if not root then return end
+
+			local hl = Instance.new("Highlight")
+			hl.Name = "GreenESP_Highlight"
+			hl.Adornee = char
+			hl.FillColor = Color3.fromRGB(34, 197, 94)
+			hl.OutlineColor = Color3.fromRGB(74, 222, 128)
+			hl.FillTransparency = 0.55
+			hl.OutlineTransparency = 0
+			hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+			hl.Parent = container
+
+			local billboard = Instance.new("BillboardGui")
+			billboard.Name = "GreenESP_NameTag"
+			billboard.Adornee = head or root
+			billboard.Size = UDim2.new(0, 160, 0, 26)
+			billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+			billboard.AlwaysOnTop = true
+			billboard.Parent = container
+
+			local nameTag = Instance.new("TextLabel")
+			nameTag.Size = UDim2.new(1, 0, 1, 0)
+			nameTag.BackgroundTransparency = 1
+			nameTag.Text = plr.DisplayName .. " (@" .. plr.Name .. ")"
+			nameTag.TextColor3 = Color3.fromRGB(34, 197, 94)
+			nameTag.Font = Enum.Font.GothamBold
+			nameTag.TextSize = 13
+			nameTag.TextStrokeTransparency = 0.25
+			nameTag.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+			nameTag.Parent = billboard
+		end)
+	end
+
+	if plr.Character then
+		AttachToCharacter(plr.Character)
+	end
+	plr.CharacterAdded:Connect(function(newChar)
+		if HubState.Toggles["PlayerESP"] then
+			AttachToCharacter(newChar)
+		end
+	end)
+end
+
+local function RefreshAllESP()
+	ClearAllESP()
+	if not HubState.Toggles["PlayerESP"] then return end
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer then
+			CreateESPForPlayer(plr)
+		end
+	end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+	if HubState.Toggles["PlayerESP"] then
+		CreateESPForPlayer(plr)
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+	savedOriginalHitboxes[plr] = nil
+	local item = espFolder:FindFirstChild("ESP_" .. plr.UserId)
+	if item then item:Destroy() end
+end)
+
+local noclipSavedCollide = {}
+local function ApplyNoclipStep()
+	local char = LocalPlayer.Character
+	if not char then return end
+
+	if HubState.Toggles["Noclip"] then
+		for _, part in ipairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				if noclipSavedCollide[part] == nil then
+					noclipSavedCollide[part] = part.CanCollide
+				end
+				part.CanCollide = false
+			end
+		end
+	elseif next(noclipSavedCollide) ~= nil then
+		for part, origCollide in pairs(noclipSavedCollide) do
+			if part and part.Parent then
+				part.CanCollide = origCollide
+			end
+		end
+		noclipSavedCollide = {}
+	end
+end
+
+local flyBodyVel, flyBodyGyro
+local function StopFly()
+	if flyBodyVel then flyBodyVel:Destroy() flyBodyVel = nil end
+	if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+	local char = LocalPlayer.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum and hum.PlatformStand then
+		hum.PlatformStand = false
+	end
+end
+
+local function ApplyFlyStep(dt)
+	local char = LocalPlayer.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not root or not hum then
+		StopFly()
+		return
+	end
+
+	if not HubState.Toggles["Fly"] then
+		StopFly()
+		return
+	end
+
+	if not flyBodyVel or not flyBodyVel.Parent then
+		flyBodyVel = Instance.new("BodyVelocity")
+		flyBodyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+		flyBodyVel.Velocity = Vector3.zero
+		flyBodyVel.Parent = root
+	end
+
+	if not flyBodyGyro or not flyBodyGyro.Parent then
+		flyBodyGyro = Instance.new("BodyGyro")
+		flyBodyGyro.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+		flyBodyGyro.P = 1e4
+		flyBodyGyro.Parent = root
+	end
+
+	local cam = workspace.CurrentCamera
+	local flySpeed = tonumber(HubState.Sliders["FlySpeed"]) or 50
+	local moveDir = hum.MoveDirection
+	local vertical = 0
+
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) then vertical += 1 end
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then vertical -= 1 end
+
+	local camLook = cam and cam.CFrame.LookVector or Vector3.new(0, 0, -1)
+	local camRight = cam and cam.CFrame.RightVector or Vector3.new(1, 0, 0)
+	local finalVel = Vector3.zero
+
+	if moveDir.Magnitude > 0.05 then
+		local forwardAmt = moveDir:Dot(Vector3.new(camLook.X, 0, camLook.Z).Unit)
+		local rightAmt = moveDir:Dot(Vector3.new(camRight.X, 0, camRight.Z).Unit)
+		local dir3D = (camLook * forwardAmt + camRight * rightAmt)
+		if dir3D.Magnitude > 0.05 then
+			finalVel = dir3D.Unit * flySpeed
+		end
+	end
+
+	if vertical ~= 0 then
+		finalVel += Vector3.new(0, vertical * flySpeed, 0)
+	end
+
+	flyBodyVel.Velocity = finalVel
+	if cam then
+		flyBodyGyro.CFrame = CFrame.lookAt(root.Position, root.Position + cam.CFrame.LookVector)
+	end
+end
+
+local function ApplyAntiKnockbackStep()
+	if not HubState.Toggles["GodMode"] then return end
+	local char = LocalPlayer.Character
+	if not char then return end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local root = char:FindFirstChild("HumanoidRootPart")
+
+	if hum then
+		hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+		hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+		if not HubState.Toggles["Fly"] then
+			hum.PlatformStand = false
+		end
+	end
+
+	if root and not HubState.Toggles["Fly"] then
+		local v = root.AssemblyLinearVelocity
+		local horiz = Vector3.new(v.X, 0, v.Z)
+		if horiz.Magnitude > 120 then
+			root.AssemblyLinearVelocity = Vector3.new(0, math.clamp(v.Y, -50, 50), 0)
+		end
+	end
+end
+
+-- ระบบ Hit Players: ไม่ใช้ VirtualUser คลิกหน้าจอเพื่อไม่ให้ปุ่มเดิน/จอยหาย และไม่ไปทับการเดินของตัวละคร
+local lastHitTick = 0
+local function ApplyHitPlayersStep()
+	if not HubState.Toggles["HitPlayers"] then return end
+	if os.clock() - lastHitTick < 0.16 then return end
+
+	local char = LocalPlayer.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not char or not root or not hum or hum.Health <= 0 then return end
+
+	local equippedTool = char:FindFirstChildOfClass("Tool")
+	if not equippedTool then return end
+
+	local maxRange = tonumber(HubState.Sliders["HitRange"]) or 25
+	local closestRoot = nil
+	local closestDist = maxRange
+
+	for _, plr in ipairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and plr.Character then
+			local targetHum = plr.Character:FindFirstChildOfClass("Humanoid")
+			local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+			if targetHum and targetHum.Health > 0 and targetRoot then
+				local dist = (targetRoot.Position - root.Position).Magnitude
+				if dist <= closestDist then
+					closestDist = dist
+					closestRoot = targetRoot
+				end
+			end
+		end
+	end
+
+	if closestRoot then
+		lastHitTick = os.clock()
+		pcall(function()
+			local lookPos = Vector3.new(closestRoot.Position.X, root.Position.Y, closestRoot.Position.Z)
+			if (lookPos - root.Position).Magnitude > 0.25 then
+				local targetCF = CFrame.lookAt(root.Position, lookPos)
+				root.CFrame = root.CFrame:Lerp(targetCF, 0.45)
+			end
+			equippedTool:Activate()
+		end)
+	end
+end
+
+-- ลูป Smooth สเกล UI และขนาดตัวหนังสือแยกจากกันอย่างลื่นไหล
+RunService.RenderStepped:Connect(function(dt)
+	local alpha = math.clamp(dt * 18, 0, 1)
+
+	-- 1. ปรับขนาดหน้าต่าง UI แบบลื่นไหล (เฉพาะ UIScale)
+	if math.abs(UIScale.Scale - targetUIScale) > 0.0005 then
+		UIScale.Scale = UIScale.Scale + (targetUIScale - UIScale.Scale) * alpha
+	else
+		UIScale.Scale = targetUIScale
+	end
+
+	-- 2. ปรับขนาดตัวหนังสือของฟังก์ชันแบบลื่นไหล (เฉพาะป้ายชื่อฟังก์ชัน ไม่เกี่ยวกับ UIScale)
+	if math.abs(currentFeatureTextSize - targetFeatureTextSize) > 0.05 then
+		currentFeatureTextSize = currentFeatureTextSize + (targetFeatureTextSize - currentFeatureTextSize) * alpha
+		local intSize = math.clamp(math.floor(currentFeatureTextSize + 0.5), 1, 100)
+		for _, lbl in ipairs(ManagedFeatureLabels) do
+			if lbl and lbl.Parent then
+				lbl.TextSize = intSize
+			end
+		end
+	elseif currentFeatureTextSize ~= targetFeatureTextSize then
+		currentFeatureTextSize = targetFeatureTextSize
+		for _, lbl in ipairs(ManagedFeatureLabels) do
+			if lbl and lbl.Parent then
+				lbl.TextSize = targetFeatureTextSize
+			end
+		end
+	end
+
+	ApplyFlyStep(dt)
+	ApplyHitPlayersStep()
+end)
+
+RunService.Heartbeat:Connect(function()
+	if HubState.Toggles["SpeedToggle"] then
+		SyncWalkSpeed()
+	end
+	ApplyNoclipStep()
+	ApplyAntiKnockbackStep()
+	if HubState.Toggles["HitboxToggle"] then
+		UpdatePlayerHitboxes()
+	end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+	task.wait(0.25)
+	local hum = newChar:FindFirstChildOfClass("Humanoid")
+	if hum then
+		defaultWalkSpeed = hum.WalkSpeed
+		if HubState.Toggles["SpeedToggle"] then
+			SyncWalkSpeed()
+		end
+	end
+	if HubState.Toggles["PlayerESP"] then
+		RefreshAllESP()
+	end
+end)
+
+-- ============================================================================
+-- [ส่วนที่ 11: ระบบ Ultra FPS Boost (ปรับภาพต่ำสุด + ลบรายละเอียดที่ไม่จำเป็น)]
+-- ============================================================================
 local fpsDescendantConn
 local function StripUnnecessaryDetails(obj)
-    pcall(function()
-        if obj:IsA("BasePart") then
-            obj.Material = Enum.Material.SmoothPlastic
-            obj.Reflectance = 0
-            obj.CastShadow = false
-            if obj:IsA("MeshPart") then
-                obj.RenderFidelity = Enum.RenderFidelity.Performance
-                obj.TextureID = ""
-            end
-        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            obj.Transparency = 1
-        elseif obj:IsA("SurfaceAppearance") or obj:IsA("ShirtGraphic") or obj:IsA("CharacterMesh") then
-            obj:Destroy()
-        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-            obj.Enabled = false
-        elseif obj:IsA("Explosion") then
-            obj.Visible = false
-        elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-            obj.Enabled = false
-        elseif obj:IsA("PostEffect") or obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("Clouds") then
-            if obj:IsA("PostEffect") then
-                obj.Enabled = false
-            else
-                obj:Destroy()
-            end
-        end
-    end)
+	pcall(function()
+		if obj:IsA("BasePart") then
+			obj.Material = Enum.Material.SmoothPlastic
+			obj.Reflectance = 0
+			obj.CastShadow = false
+			if obj:IsA("MeshPart") then
+				obj.RenderFidelity = Enum.RenderFidelity.Performance
+				obj.TextureID = ""
+			end
+		elseif obj:IsA("Decal") or obj:IsA("Texture") then
+			obj.Transparency = 1
+		elseif obj:IsA("SurfaceAppearance") or obj:IsA("ShirtGraphic") or obj:IsA("CharacterMesh") then
+			obj:Destroy()
+		elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+			obj.Enabled = false
+		elseif obj:IsA("Explosion") then
+			obj.Visible = false
+		elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
+			obj.Enabled = false
+		elseif obj:IsA("PostEffect") or obj:IsA("Atmosphere") or obj:IsA("Sky") or obj:IsA("Clouds") then
+			if obj:IsA("PostEffect") then
+				obj.Enabled = false
+			else
+				obj:Destroy()
+			end
+		end
+	end)
 end
 
 local function EnableUltraFPSBoost()
-    pcall(function()
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 9e9
-        Lighting.FogStart = 9e9
-        Lighting.Brightness = 1
-        Lighting.EnvironmentDiffuseScale = 0
-        Lighting.EnvironmentSpecularScale = 0
-        sethiddenproperty(Lighting, "Technology", Enum.Technology.Voxel)
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
+	pcall(function()
+		Lighting.GlobalShadows = false
+		Lighting.FogEnd = 9e9
+		Lighting.FogStart = 9e9
+		Lighting.Brightness = 1
+		Lighting.EnvironmentDiffuseScale = 0
+		Lighting.EnvironmentSpecularScale = 0
+		sethiddenproperty(Lighting, "Technology", Enum.Technology.Voxel)
+		settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+		settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
 
-        local terrain = workspace:FindFirstChildOfClass("Terrain")
-        if terrain then
-            terrain.WaterWaveSize = 0
-            terrain.WaterWaveSpeed = 0
-            terrain.WaterReflectance = 0
-            terrain.WaterTransparency = 0
-            terrain.Decoration = false
-        end
+		local terrain = workspace:FindFirstChildOfClass("Terrain")
+		if terrain then
+			terrain.WaterWaveSize = 0
+			terrain.WaterWaveSpeed = 0
+			terrain.WaterReflectance = 0
+			terrain.WaterTransparency = 0
+			terrain.Decoration = false
+		end
 
-        for _, v in ipairs(Lighting:GetChildren()) do
-            StripUnnecessaryDetails(v)
-        end
-        for _, v in ipairs(workspace:GetDescendants()) do
-            StripUnnecessaryDetails(v)
-        end
+		for _, v in ipairs(Lighting:GetChildren()) do
+			StripUnnecessaryDetails(v)
+		end
+		for _, v in ipairs(workspace:GetDescendants()) do
+			StripUnnecessaryDetails(v)
+		end
 
-        if not fpsDescendantConn then
-            fpsDescendantConn = workspace.DescendantAdded:Connect(function(desc)
-                if HubState.Toggles["UltraFPS"] then
-                    StripUnnecessaryDetails(desc)
-                end
-            end)
-        end
-    end)
+		if not fpsDescendantConn then
+			fpsDescendantConn = workspace.DescendantAdded:Connect(function(desc)
+				if HubState.Toggles["UltraFPS"] then
+					StripUnnecessaryDetails(desc)
+				end
+			end)
+		end
+	end)
 end
 
--- ============================================
--- Create All Tabs
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 12: สร้างรายชื่อแท็บหลักในแถบเมนูซ้าย]
+-- ============================================================================
 AddCategoryLabel("MAIN")
-local FarmTab = CreateTab("Farm", "◎")
-local UpgradesTab = CreateTab("Upgrades", "🛒")
+local HomeTab = CreateTab("Home", "🏠")
+local PlayersTab = CreateTab("Players", "👤")
 local MiscTab = CreateTab("Misc", "🔧")
 
 AddCategoryLabel("OTHER")
 local SettingsTab = CreateTab("Settings", "⚙️")
 
--- ============================================
--- 1. Farm Tab
--- ============================================
-local FarmCard = CreateCard(FarmTab.Left, "Farm", "◎", true)
-AddToggle(FarmCard, "AutoFarm", "Auto Farm", false, function(v) end)
-AddToggle(FarmCard, "PerfectMeter", "Perfect Meter", false, function(v) end)
-AddSmoothSlider(FarmCard, "FarmDelay", "Farm Delay", 1, 30, 5, " s", function(v) end)
+-- ============================================================================
+-- [ส่วนที่ 13: เนื้อหาแท็บ Home (Announcements + Status 6 ช่องเรียลไทม์)]
+-- ============================================================================
+local AnnounceCard = CreateCard(HomeTab.Left, "Announcements", "🔔", true)
 
-local TrainingCard = CreateCard(FarmTab.Right, "Training", "⚡", true)
-AddToggle(TrainingCard, "AutoTrain", "Auto Train", false, function(v) end)
+local verLabel = Instance.new("TextLabel")
+verLabel.Size = UDim2.new(1, 0, 0, 20)
+verLabel.BackgroundTransparency = 1
+verLabel.Text = HubSettings.Version
+verLabel.TextColor3 = Theme.Text
+verLabel.Font = Enum.Font.GothamBold
+verLabel.TextSize = 14
+verLabel.TextXAlignment = Enum.TextXAlignment.Left
+verLabel.Parent = AnnounceCard
 
--- ============================================
--- 2. Upgrades Tab
--- ============================================
-local UpgradeCard = CreateCard(UpgradesTab.Left, "Auto Upgrades", "🛒", true)
-AddToggle(UpgradeCard, "UpgradeSpeed", "Upgrade Speed", false, function(v) end)
-AddToggle(UpgradeCard, "UpgradePower", "Upgrade Power", false, function(v) end)
+local dateLabel = Instance.new("TextLabel")
+dateLabel.Size = UDim2.new(1, 0, 0, 16)
+dateLabel.BackgroundTransparency = 1
+dateLabel.Text = HubSettings.AnnouncementDate
+dateLabel.TextColor3 = Theme.SubText
+dateLabel.Font = Enum.Font.Gotham
+dateLabel.TextSize = 12
+dateLabel.TextXAlignment = Enum.TextXAlignment.Left
+dateLabel.Parent = AnnounceCard
 
--- ============================================
--- 3. Misc Tab
--- ============================================
+for _, logLine in ipairs(HubSettings.AnnouncementLogs) do
+	local itemLbl = Instance.new("TextLabel")
+	itemLbl.Size = UDim2.new(1, 0, 0, 18)
+	itemLbl.BackgroundTransparency = 1
+	itemLbl.Text = logLine
+	itemLbl.TextColor3 = Theme.SubText
+	itemLbl.Font = Enum.Font.Gotham
+	itemLbl.TextSize = 12
+	itemLbl.TextXAlignment = Enum.TextXAlignment.Left
+	itemLbl.TextWrapped = true
+	itemLbl.AutomaticSize = Enum.AutomaticSize.Y
+	itemLbl.Parent = AnnounceCard
+end
+
+local StatusCard = CreateCard(HomeTab.Right, "Status", "🕒", true)
+
+local StatusGrid = Instance.new("Frame")
+StatusGrid.Size = UDim2.new(1, 0, 0, 130)
+StatusGrid.BackgroundTransparency = 1
+StatusGrid.Parent = StatusCard
+
+local GridLayout = Instance.new("UIGridLayout")
+GridLayout.CellSize = UDim2.new(0.315, 0, 0, 58)
+GridLayout.CellPadding = UDim2.new(0.025, 0, 0, 8)
+GridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+GridLayout.Parent = StatusGrid
+
+local function CreateStatTile(titleSub, initialVal)
+	local tile = Instance.new("Frame")
+	tile.BackgroundColor3 = Theme.ElementBg
+	tile.BorderSizePixel = 0
+	tile.Parent = StatusGrid
+	Instance.new("UICorner", tile).CornerRadius = UDim.new(0, 8)
+	local tStroke = Instance.new("UIStroke", tile)
+	tStroke.Color = Theme.Border
+	RegisterBorderStroke(tStroke)
+
+	local valLbl = Instance.new("TextLabel")
+	valLbl.Size = UDim2.new(1, -12, 0, 22)
+	valLbl.Position = UDim2.new(0, 8, 0, 8)
+	valLbl.BackgroundTransparency = 1
+	valLbl.Text = initialVal
+	valLbl.TextColor3 = Theme.Text
+	valLbl.Font = Enum.Font.GothamBold
+	valLbl.TextSize = 13
+	valLbl.TextXAlignment = Enum.TextXAlignment.Left
+	valLbl.TextTruncate = Enum.TextTruncate.AtEnd
+	valLbl.Parent = tile
+
+	local subLbl = Instance.new("TextLabel")
+	subLbl.Size = UDim2.new(1, -12, 0, 16)
+	subLbl.Position = UDim2.new(0, 8, 0, 32)
+	subLbl.BackgroundTransparency = 1
+	subLbl.Text = titleSub
+	subLbl.TextColor3 = Theme.SubText
+	subLbl.Font = Enum.Font.Gotham
+	subLbl.TextSize = 11
+	subLbl.TextXAlignment = Enum.TextXAlignment.Left
+	subLbl.Parent = tile
+
+	return valLbl
+end
+
+local statSessionLbl  = CreateStatTile("session", "0m 0s")
+local statFeaturesLbl = CreateStatTile("features on", "0")
+local statFpsLbl      = CreateStatTile("fps", "60")
+local statPingLbl     = CreateStatTile("ping", "0 ms")
+local statPlayersLbl  = CreateStatTile("players", "1/1")
+local statKeyTimeLbl  = CreateStatTile("key time", HubSettings.KeyTimeText)
+
+local startTime = os.clock()
+local currentFps = 60
+RunService.RenderStepped:Connect(function(dt)
+	if dt > 0 then
+		currentFps = math.floor(1 / dt + 0.5)
+	end
+end)
+
+task.spawn(function()
+	while ScreenGui and ScreenGui.Parent do
+		local elapsed = math.floor(os.clock() - startTime)
+		local mins = math.floor(elapsed / 60)
+		local secs = elapsed % 60
+		statSessionLbl.Text = string.format("%dm %ds", mins, secs)
+
+		local activeCount = 0
+		for _, isOn in pairs(HubState.Toggles) do
+			if isOn == true then
+				activeCount = activeCount + 1
+			end
+		end
+		statFeaturesLbl.Text = tostring(activeCount)
+		statFpsLbl.Text = tostring(currentFps)
+
+		local pingVal = 0
+		pcall(function()
+			pingVal = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() + 0.5)
+		end)
+		statPingLbl.Text = tostring(pingVal) .. " ms"
+		statPlayersLbl.Text = tostring(#Players:GetPlayers()) .. "/" .. tostring(Players.MaxPlayers)
+
+		task.wait(1)
+	end
+end)
+
+-- ============================================================================
+-- [ส่วนที่ 14: เนื้อหาแท็บ Players (Speed, Hitbox, ESP, Noclip, Fly, God Mode, Hit Players)]
+-- ============================================================================
+local MovementCard = CreateCard(PlayersTab.Left, "Movement & Mod", "⚡", true)
+AddToggle(MovementCard, "SpeedToggle", "Speed", false, function(state)
+	SyncWalkSpeed()
+end)
+AddSmoothSlider(MovementCard, "SpeedValue", "Walk Speed", 1, 1000, 16, "", function(val)
+	if HubState.Toggles["SpeedToggle"] then
+		SyncWalkSpeed()
+	end
+end)
+
+AddToggle(MovementCard, "Noclip", "Noclip", false, function(state)
+	if not state then
+		ApplyNoclipStep()
+	end
+end)
+
+AddToggle(MovementCard, "Fly", "Fly", false, function(state)
+	if not state then
+		StopFly()
+	end
+end)
+AddSmoothSlider(MovementCard, "FlySpeed", "Fly Speed", 10, 500, 50, "", function(val) end)
+
+AddToggle(MovementCard, "GodMode", "God Mode (No Knockback)", false, function(state) end)
+
+local CombatVisualCard = CreateCard(PlayersTab.Right, "Combat & Visuals", "🎯", true)
+AddToggle(CombatVisualCard, "HitboxToggle", "Hitbox", false, function(state)
+	UpdatePlayerHitboxes()
+end)
+AddSmoothSlider(CombatVisualCard, "HitboxSize", "Hitbox Size", 1, 100, 15, "", function(val)
+	if HubState.Toggles["HitboxToggle"] then
+		UpdatePlayerHitboxes()
+	end
+end)
+
+AddToggle(CombatVisualCard, "PlayerESP", "ESP Players (Green)", false, function(state)
+	RefreshAllESP()
+end)
+
+AddToggle(CombatVisualCard, "HitPlayers", "Hit Players (Auto Attack)", false, function(state) end)
+AddSmoothSlider(CombatVisualCard, "HitRange", "Hit Range", 5, 100, 25, " studs", function(val) end)
+
+-- ============================================================================
+-- [ส่วนที่ 15: เนื้อหาแท็บ Misc (ฟังก์ชันสำเร็จรูป ใช้ได้จริงทุกเกม)]
+-- ============================================================================
 local PerfCard = CreateCard(MiscTab.Left, "Performance", "📊", true)
 
 AddToggle(PerfCard, "BlackScreen", "Black Screen", false, function(state)
-    BlackScreenOverlay.Visible = state
-    RunService:Set3dRenderingEnabled(not state)
+	BlackScreenOverlay.Visible = state
+	RunService:Set3dRenderingEnabled(not state)
 end)
 
 AddToggle(PerfCard, "UltraFPS", "Ultra FPS Boost", false, function(state)
-    if state then
-        EnableUltraFPSBoost()
-    else
-        if fpsDescendantConn then
-            fpsDescendantConn:Disconnect()
-            fpsDescendantConn = nil
-        end
-        pcall(function()
-            Lighting.GlobalShadows = true
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
-        end)
-    end
+	if state then
+		EnableUltraFPSBoost()
+	else
+		if fpsDescendantConn then
+			fpsDescendantConn:Disconnect()
+			fpsDescendantConn = nil
+		end
+		pcall(function()
+			Lighting.GlobalShadows = true
+			settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+		end)
+	end
 end)
 
 local ProtCard = CreateCard(MiscTab.Left, "Protection", "🛡️", true)
 
 local antiAfkConn
 AddToggle(ProtCard, "AntiAFK", "Anti AFK", true, function(state)
-    if state then
-        if not antiAfkConn then
-            antiAfkConn = LocalPlayer.Idled:Connect(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.new())
-            end)
-        end
-    else
-        if antiAfkConn then
-            antiAfkConn:Disconnect()
-            antiAfkConn = nil
-        end
-    end
+	if state then
+		if not antiAfkConn then
+			antiAfkConn = LocalPlayer.Idled:Connect(function()
+				VirtualUser:CaptureController()
+				VirtualUser:ClickButton2(Vector2.new())
+			end)
+		end
+	else
+		if antiAfkConn then
+			antiAfkConn:Disconnect()
+			antiAfkConn = nil
+		end
+	end
 end)
 
 local SessionCard = CreateCard(MiscTab.Right, "Session", "🔄", true)
 
 AddToggle(SessionCard, "AutoExecute", "Auto Execute", false, function(state)
-    if state then
-        local qot = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
-        if qot then
-            pcall(function()
-                qot('print("FARTEZ HUB Auto-Executed!")')
-            end)
-        end
-    end
+	if state then
+		local qot = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+		if qot then
+			pcall(function()
+				qot('print("' .. HubSettings.HubName .. ' Auto-Executed!")')
+			end)
+		end
+	end
 end)
 
 local autoReconnectConn
 AddToggle(SessionCard, "AutoReconnect", "Auto Reconnect", false, function(state)
-    if state then
-        if not autoReconnectConn then
-            autoReconnectConn = GuiService.ErrorMessageChanged:Connect(function()
-                task.wait(1.5)
-                if #Players:GetPlayers() <= 1 then
-                    TeleportService:Teleport(game.PlaceId, LocalPlayer)
-                else
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-                end
-            end)
-        end
-    else
-        if autoReconnectConn then
-            autoReconnectConn:Disconnect()
-            autoReconnectConn = nil
-        end
-    end
+	if state then
+		if not autoReconnectConn then
+			autoReconnectConn = GuiService.ErrorMessageChanged:Connect(function()
+				task.wait(1.5)
+				if #Players:GetPlayers() <= 1 then
+					TeleportService:Teleport(game.PlaceId, LocalPlayer)
+				else
+					TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+				end
+			end)
+		end
+	else
+		if autoReconnectConn then
+			autoReconnectConn:Disconnect()
+			autoReconnectConn = nil
+		end
+	end
 end)
 
 local ServerCard = CreateCard(MiscTab.Right, "Server", "🌐", true)
@@ -1067,36 +1781,52 @@ AddLabel(ServerCard, "Job ID: " .. currentJobId, Theme.SubText)
 
 local copyBtn = AddButton(ServerCard, "Copy Job ID", Theme.Text, function() end)
 copyBtn.MouseButton1Click:Connect(function()
-    if setclipboard then
-        setclipboard(currentJobId)
-        copyBtn.Text = "Copied!"
-        copyBtn.TextColor3 = Theme.Green
-        task.delay(1.5, function()
-            copyBtn.Text = "Copy Job ID"
-            copyBtn.TextColor3 = Theme.Text
-        end)
-    end
+	if setclipboard then
+		setclipboard(currentJobId)
+		copyBtn.Text = "Copied!"
+		copyBtn.TextColor3 = Theme.Green
+		task.delay(1.5, function()
+			copyBtn.Text = "Copy Job ID"
+			copyBtn.TextColor3 = Theme.Text
+		end)
+	end
 end)
 
 AddButton(ServerCard, "Rejoin", Theme.Text, function()
-    if #Players:GetPlayers() <= 1 then
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
-    else
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
-    end
+	if #Players:GetPlayers() <= 1 then
+		TeleportService:Teleport(game.PlaceId, LocalPlayer)
+	else
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+	end
 end)
 
--- ============================================
--- 4. Settings Tab
--- ============================================
+-- ============================================================================
+-- [ส่วนที่ 16: เนื้อหาแท็บ Settings (ปรับขนาด UI / ขนาดตัวหนังสือแยกอิสระ + สี + ล็อค + Configs)]
+-- ============================================================================
 local UISettingsCard = CreateCard(SettingsTab.Left, "UI Settings", "⚙️", true)
-AddSmoothSlider(UISettingsCard, "UIScalePct", "UI Scale", 1, 100, 75, "%", function(pct)
-    local targetScale = math.clamp(pct / 100, 0.01, 1)
-    TweenService:Create(UIScale, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Scale = targetScale
-    }):Play()
+
+-- ปรับขนาดหน้าต่าง UI (ไม่ยุ่งกับขนาดตัวหนังสือ)
+AddSmoothSlider(UISettingsCard, "UIScalePct", "UI Scale", 1, 100, math.floor(HubSettings.DefaultScale * 100), "%", function(pct)
+	targetUIScale = math.clamp(pct / 100, 0.01, 1)
 end)
 
+-- ปรับขนาดตัวหนังสือตามฟังก์ชันต่างๆ 1 - 100 (แยกอิสระจากขนาด UI)
+AddSmoothSlider(UISettingsCard, "FeatureTextSize", "Text Size", 1, 100, HubSettings.DefaultTextSize, " px", function(sz)
+	SetTargetFeatureTextSize(sz)
+end)
+
+AddOptionSelector(UISettingsCard, "FeatureTextColor", "Text Color", TextColorOrder, "White", function(colorName)
+	ApplyTextColorPreset(colorName)
+end)
+
+AddOptionSelector(UISettingsCard, "UIBorderColor", "Border Color", BorderColorOrder, "Green", function(borderName)
+	ApplyBorderColorPreset(borderName)
+end)
+
+AddToggle(UISettingsCard, "LockUI", "Lock UI Position", false, function(v) end)
+AddToggle(UISettingsCard, "LockToggleBtn", "Lock Toggle Button", false, function(v) end)
+
+-- กล่องจัดการ Configs
 local ConfigsCard = CreateCard(SettingsTab.Right, "Configs", "📁", true)
 
 local configNameInput = Instance.new("TextBox")
@@ -1114,7 +1844,9 @@ configNameInput.Parent = ConfigsCard
 Instance.new("UICorner", configNameInput).CornerRadius = UDim.new(0, 8)
 local cfgPad = Instance.new("UIPadding", configNameInput)
 cfgPad.PaddingLeft = UDim.new(0, 10)
-Instance.new("UIStroke", configNameInput).Color = Theme.Border
+local cfgStroke = Instance.new("UIStroke", configNameInput)
+cfgStroke.Color = Theme.Border
+RegisterBorderStroke(cfgStroke)
 
 local selectedConfig = "--"
 local dropdownOpen = false
@@ -1126,7 +1858,9 @@ dropdownBtn.Text = ""
 dropdownBtn.AutoButtonColor = false
 dropdownBtn.Parent = ConfigsCard
 Instance.new("UICorner", dropdownBtn).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", dropdownBtn).Color = Theme.Border
+local ddStroke = Instance.new("UIStroke", dropdownBtn)
+ddStroke.Color = Theme.Border
+RegisterBorderStroke(ddStroke)
 
 local dropdownText = Instance.new("TextLabel")
 dropdownText.Size = UDim2.new(1, -30, 1, 0)
@@ -1156,232 +1890,249 @@ dropdownListFrame.BackgroundColor3 = Theme.BgDark
 dropdownListFrame.Visible = false
 dropdownListFrame.Parent = ConfigsCard
 Instance.new("UICorner", dropdownListFrame).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", dropdownListFrame).Color = Theme.Border
+local ddListStroke = Instance.new("UIStroke", dropdownListFrame)
+ddListStroke.Color = Theme.Border
+RegisterBorderStroke(ddListStroke)
 local ddListLayout = Instance.new("UIListLayout", dropdownListFrame)
 ddListLayout.Padding = UDim.new(0, 2)
 
 local statusInfoLbl = AddLabel(ConfigsCard, "loaded: none | autoload: none", Theme.SubText)
 
 local function UpdateConfigStatusLabel()
-    statusInfoLbl.Text = "loaded: " .. HubState.CurrentConfig .. " | autoload: " .. HubState.AutoloadConfig
+	statusInfoLbl.Text = "loaded: " .. HubState.CurrentConfig .. " | autoload: " .. HubState.AutoloadConfig
 end
 
 local function RefreshConfigList()
-    for _, c in ipairs(dropdownListFrame:GetChildren()) do
-        if c:IsA("TextButton") then c:Destroy() end
-    end
-    if not HasFileSystem() then return end
+	for _, c in ipairs(dropdownListFrame:GetChildren()) do
+		if c:IsA("TextButton") then c:Destroy() end
+	end
+	if not HasFileSystem() then return end
 
-    local files = listfiles(ConfigFolder)
-    local count = 0
-    for _, filepath in ipairs(files) do
-        local filename = filepath:match("([^/\\]+)%.json$")
-        if filename and filename ~= "_autoload" then
-            count = count + 1
-            local itemBtn = Instance.new("TextButton")
-            itemBtn.Size = UDim2.new(1, 0, 0, 26)
-            itemBtn.BackgroundColor3 = Theme.ElementBg
-            itemBtn.BackgroundTransparency = 0.5
-            itemBtn.Text = "  " .. filename
-            itemBtn.TextColor3 = Theme.Text
-            itemBtn.Font = Enum.Font.Gotham
-            itemBtn.TextSize = 12
-            itemBtn.TextXAlignment = Enum.TextXAlignment.Left
-            itemBtn.Parent = dropdownListFrame
+	local files = listfiles(ConfigFolder)
+	local count = 0
+	for _, filepath in ipairs(files) do
+		local filename = filepath:match("([^/\\]+)%.json$")
+		if filename and filename ~= "_autoload" then
+			count = count + 1
+			local itemBtn = Instance.new("TextButton")
+			itemBtn.Size = UDim2.new(1, 0, 0, 26)
+			itemBtn.BackgroundColor3 = Theme.ElementBg
+			itemBtn.BackgroundTransparency = 0.5
+			itemBtn.Text = "  " .. filename
+			itemBtn.TextColor3 = Theme.Text
+			itemBtn.Font = Enum.Font.Gotham
+			itemBtn.TextSize = 12
+			itemBtn.TextXAlignment = Enum.TextXAlignment.Left
+			itemBtn.Parent = dropdownListFrame
 
-            itemBtn.MouseButton1Click:Connect(function()
-                selectedConfig = filename
-                dropdownText.Text = filename
-                dropdownOpen = false
-                dropdownListFrame.Visible = false
-            end)
-        end
-    end
+			itemBtn.MouseButton1Click:Connect(function()
+				selectedConfig = filename
+				dropdownText.Text = filename
+				dropdownOpen = false
+				dropdownListFrame.Visible = false
+			end)
+		end
+	end
 
-    if count == 0 then
-        local emptyBtn = Instance.new("TextButton")
-        emptyBtn.Size = UDim2.new(1, 0, 0, 26)
-        emptyBtn.BackgroundTransparency = 1
-        emptyBtn.Text = "  No saved configs"
-        emptyBtn.TextColor3 = Theme.SubText
-        emptyBtn.Font = Enum.Font.Gotham
-        emptyBtn.TextSize = 12
-        emptyBtn.TextXAlignment = Enum.TextXAlignment.Left
-        emptyBtn.Parent = dropdownListFrame
-    end
+	if count == 0 then
+		local emptyBtn = Instance.new("TextButton")
+		emptyBtn.Size = UDim2.new(1, 0, 0, 26)
+		emptyBtn.BackgroundTransparency = 1
+		emptyBtn.Text = "  No saved configs"
+		emptyBtn.TextColor3 = Theme.SubText
+		emptyBtn.Font = Enum.Font.Gotham
+		emptyBtn.TextSize = 12
+		emptyBtn.TextXAlignment = Enum.TextXAlignment.Left
+		emptyBtn.Parent = dropdownListFrame
+	end
 end
 
 dropdownBtn.MouseButton1Click:Connect(function()
-    RefreshConfigList()
-    dropdownOpen = not dropdownOpen
-    dropdownListFrame.Visible = dropdownOpen
+	RefreshConfigList()
+	dropdownOpen = not dropdownOpen
+	dropdownListFrame.Visible = dropdownOpen
 end)
 
 local function GetTargetConfigName()
-    local typed = configNameInput.Text:gsub("[^%w_%-]", "")
-    if typed ~= "" then
-        return typed
-    elseif selectedConfig ~= "--" then
-        return selectedConfig
-    end
-    return nil
+	local typed = configNameInput.Text:gsub("[^%w_%-]", "")
+	if typed ~= "" then
+		return typed
+	elseif selectedConfig ~= "--" then
+		return selectedConfig
+	end
+	return nil
 end
 
 local function SaveConfigFile(cfgName)
-    if not HasFileSystem() or not cfgName or cfgName == "" or cfgName == "--" then return end
-    local data = {
-        Toggles = HubState.Toggles,
-        Sliders = HubState.Sliders
-    }
-    writefile(ConfigFolder .. "/" .. cfgName .. ".json", HttpService:JSONEncode(data))
-    selectedConfig = cfgName
-    dropdownText.Text = cfgName
-    HubState.CurrentConfig = cfgName
-    UpdateConfigStatusLabel()
-    RefreshConfigList()
+	if not HasFileSystem() or not cfgName or cfgName == "" or cfgName == "--" then return end
+	local data = {
+		Toggles = HubState.Toggles,
+		Sliders = HubState.Sliders,
+		Dropdowns = HubState.Dropdowns
+	}
+	writefile(ConfigFolder .. "/" .. cfgName .. ".json", HttpService:JSONEncode(data))
+	selectedConfig = cfgName
+	dropdownText.Text = cfgName
+	HubState.CurrentConfig = cfgName
+	UpdateConfigStatusLabel()
+	RefreshConfigList()
 end
 
 local function LoadConfigFile(cfgName)
-    if not HasFileSystem() or not cfgName or cfgName == "" or cfgName == "--" then return end
-    local path = ConfigFolder .. "/" .. cfgName .. ".json"
-    if isfile(path) then
-        local ok, data = pcall(function() return HttpService:JSONDecode(readfile(path)) end)
-        if ok and data then
-            if data.Toggles then
-                for k, v in pairs(data.Toggles) do
-                    if HubState.ToggleSetters[k] then HubState.ToggleSetters[k](v) end
-                end
-            end
-            if data.Sliders then
-                for k, v in pairs(data.Sliders) do
-                    if HubState.SliderSetters[k] then HubState.SliderSetters[k](v) end
-                end
-            end
-            HubState.CurrentConfig = cfgName
-            selectedConfig = cfgName
-            dropdownText.Text = cfgName
-            UpdateConfigStatusLabel()
-        end
-    end
+	if not HasFileSystem() or not cfgName or cfgName == "" or cfgName == "--" then return end
+	local path = ConfigFolder .. "/" .. cfgName .. ".json"
+	if isfile(path) then
+		local ok, data = pcall(function() return HttpService:JSONDecode(readfile(path)) end)
+		if ok and data then
+			if data.Toggles then
+				for k, v in pairs(data.Toggles) do
+					if HubState.ToggleSetters[k] then HubState.ToggleSetters[k](v) end
+				end
+			end
+			if data.Sliders then
+				for k, v in pairs(data.Sliders) do
+					if HubState.SliderSetters[k] then HubState.SliderSetters[k](v) end
+				end
+			end
+			if data.Dropdowns then
+				for k, v in pairs(data.Dropdowns) do
+					if HubState.DropdownSetters[k] then HubState.DropdownSetters[k](v) end
+				end
+			end
+			HubState.CurrentConfig = cfgName
+			selectedConfig = cfgName
+			dropdownText.Text = cfgName
+			UpdateConfigStatusLabel()
+		end
+	end
 end
 
 local function CreateButtonPair(leftText, leftColor, leftCb, rightText, rightColor, rightCb)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 32)
-    row.BackgroundTransparency = 1
-    row.Parent = ConfigsCard
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 32)
+	row.BackgroundTransparency = 1
+	row.Parent = ConfigsCard
 
-    local b1 = Instance.new("TextButton")
-    b1.Size = UDim2.new(0.485, 0, 1, 0)
-    b1.BackgroundColor3 = Theme.ElementBg
-    b1.Text = leftText
-    b1.TextColor3 = leftColor
-    b1.Font = Enum.Font.GothamBold
-    b1.TextSize = 12
-    b1.Parent = row
-    Instance.new("UICorner", b1).CornerRadius = UDim.new(0, 8)
-    Instance.new("UIStroke", b1).Color = Theme.Border
-    b1.MouseButton1Click:Connect(leftCb)
+	local b1 = Instance.new("TextButton")
+	b1.Size = UDim2.new(0.485, 0, 1, 0)
+	b1.BackgroundColor3 = Theme.ElementBg
+	b1.Text = leftText
+	b1.TextColor3 = leftColor
+	b1.Font = Enum.Font.GothamBold
+	b1.TextSize = 12
+	b1.Parent = row
+	Instance.new("UICorner", b1).CornerRadius = UDim.new(0, 8)
+	local s1 = Instance.new("UIStroke", b1)
+	s1.Color = Theme.Border
+	RegisterBorderStroke(s1)
+	b1.MouseButton1Click:Connect(leftCb)
 
-    local b2 = Instance.new("TextButton")
-    b2.Size = UDim2.new(0.485, 0, 1, 0)
-    b2.Position = UDim2.new(0.515, 0, 0, 0)
-    b2.BackgroundColor3 = Theme.ElementBg
-    b2.Text = rightText
-    b2.TextColor3 = rightColor
-    b2.Font = Enum.Font.GothamBold
-    b2.TextSize = 12
-    b2.Parent = row
-    Instance.new("UICorner", b2).CornerRadius = UDim.new(0, 8)
-    Instance.new("UIStroke", b2).Color = Theme.Border
-    b2.MouseButton1Click:Connect(rightCb)
+	local b2 = Instance.new("TextButton")
+	b2.Size = UDim2.new(0.485, 0, 1, 0)
+	b2.Position = UDim2.new(0.515, 0, 0, 0)
+	b2.BackgroundColor3 = Theme.ElementBg
+	b2.Text = rightText
+	b2.TextColor3 = rightColor
+	b2.Font = Enum.Font.GothamBold
+	b2.TextSize = 12
+	b2.Parent = row
+	Instance.new("UICorner", b2).CornerRadius = UDim.new(0, 8)
+	local s2 = Instance.new("UIStroke", b2)
+	s2.Color = Theme.Border
+	RegisterBorderStroke(s2)
+	b2.MouseButton1Click:Connect(rightCb)
 end
 
 CreateButtonPair(
-    "Create", Theme.Text, function()
-        local typedName = configNameInput.Text:gsub("[^%w_%-]", "")
-        if typedName ~= "" then
-            SaveConfigFile(typedName)
-            configNameInput.Text = ""
-        end
-    end,
-    "Save", Theme.Text, function()
-        local targetName = GetTargetConfigName()
-        if targetName then
-            SaveConfigFile(targetName)
-            configNameInput.Text = ""
-        end
-    end
+	"Create", Theme.Text, function()
+		local typedName = configNameInput.Text:gsub("[^%w_%-]", "")
+		if typedName ~= "" then
+			SaveConfigFile(typedName)
+			configNameInput.Text = ""
+		end
+	end,
+	"Save", Theme.Text, function()
+		local targetName = GetTargetConfigName()
+		if targetName then
+			SaveConfigFile(targetName)
+			configNameInput.Text = ""
+		end
+	end
 )
 
 CreateButtonPair(
-    "Load", Theme.Text, function()
-        if selectedConfig ~= "--" then
-            LoadConfigFile(selectedConfig)
-        end
-    end,
-    "Delete", Theme.Red, function()
-        if HasFileSystem() and selectedConfig ~= "--" then
-            local path = ConfigFolder .. "/" .. selectedConfig .. ".json"
-            if isfile(path) then delfile(path) end
-            if HubState.CurrentConfig == selectedConfig then HubState.CurrentConfig = "none" end
-            if HubState.AutoloadConfig == selectedConfig then
-                if isfile(AutoloadFile) then delfile(AutoloadFile) end
-                HubState.AutoloadConfig = "none"
-            end
-            selectedConfig = "--"
-            dropdownText.Text = "--"
-            UpdateConfigStatusLabel()
-            RefreshConfigList()
-        end
-    end
+	"Load", Theme.Text, function()
+		if selectedConfig ~= "--" then
+			LoadConfigFile(selectedConfig)
+		end
+	end,
+	"Delete", Theme.Red, function()
+		if HasFileSystem() and selectedConfig ~= "--" then
+			local path = ConfigFolder .. "/" .. selectedConfig .. ".json"
+			if isfile(path) then delfile(path) end
+			if HubState.CurrentConfig == selectedConfig then HubState.CurrentConfig = "none" end
+			if HubState.AutoloadConfig == selectedConfig then
+				if isfile(AutoloadFile) then delfile(AutoloadFile) end
+				HubState.AutoloadConfig = "none"
+			end
+			selectedConfig = "--"
+			dropdownText.Text = "--"
+			UpdateConfigStatusLabel()
+			RefreshConfigList()
+		end
+	end
 )
 
 CreateButtonPair(
-    "Set autoload", Theme.Text, function()
-        if HasFileSystem() and selectedConfig ~= "--" then
-            writefile(AutoloadFile, selectedConfig)
-            HubState.AutoloadConfig = selectedConfig
-            UpdateConfigStatusLabel()
-        end
-    end,
-    "Clear autoload", Theme.Text, function()
-        if HasFileSystem() and isfile(AutoloadFile) then
-            delfile(AutoloadFile)
-        end
-        HubState.AutoloadConfig = "none"
-        UpdateConfigStatusLabel()
-    end
+	"Set autoload", Theme.Text, function()
+		if HasFileSystem() and selectedConfig ~= "--" then
+			writefile(AutoloadFile, selectedConfig)
+			HubState.AutoloadConfig = selectedConfig
+			UpdateConfigStatusLabel()
+		end
+	end,
+	"Clear autoload", Theme.Text, function()
+		if HasFileSystem() and isfile(AutoloadFile) then
+			delfile(AutoloadFile)
+		end
+		HubState.AutoloadConfig = "none"
+		UpdateConfigStatusLabel()
+	end
 )
 
 AddLabel(ConfigsCard, "Autoload mode", Theme.Text)
 local autoloadModeBtn = AddButton(ConfigsCard, "Mode: Always (Auto Load on Execute)", Theme.Green, function() end)
 autoloadModeBtn.MouseButton1Click:Connect(function()
-    if HubState.AutoloadMode == "Always" then
-        HubState.AutoloadMode = "Disabled"
-        autoloadModeBtn.Text = "Mode: Disabled"
-        autoloadModeBtn.TextColor3 = Theme.SubText
-    else
-        HubState.AutoloadMode = "Always"
-        autoloadModeBtn.Text = "Mode: Always (Auto Load on Execute)"
-        autoloadModeBtn.TextColor3 = Theme.Green
-    end
+	if HubState.AutoloadMode == "Always" then
+		HubState.AutoloadMode = "Disabled"
+		autoloadModeBtn.Text = "Mode: Disabled"
+		autoloadModeBtn.TextColor3 = Theme.SubText
+	else
+		HubState.AutoloadMode = "Always"
+		autoloadModeBtn.Text = "Mode: Always (Auto Load on Execute)"
+		autoloadModeBtn.TextColor3 = Theme.Green
+	end
 end)
+
+ApplyBorderColorPreset("Green")
+ApplyTextColorPreset("White")
+SetTargetFeatureTextSize(HubSettings.DefaultTextSize)
 
 RefreshConfigList()
 if HasFileSystem() and isfile(AutoloadFile) then
-    local autoName = readfile(AutoloadFile)
-    if autoName and autoName ~= "" and isfile(ConfigFolder .. "/" .. autoName .. ".json") then
-        HubState.AutoloadConfig = autoName
-        UpdateConfigStatusLabel()
-        LoadConfigFile(autoName)
-    end
+	local autoName = readfile(AutoloadFile)
+	if autoName and autoName ~= "" and isfile(ConfigFolder .. "/" .. autoName .. ".json") then
+		HubState.AutoloadConfig = autoName
+		UpdateConfigStatusLabel()
+		LoadConfigFile(autoName)
+	end
 end
 
--- Set default active tab to Farm
-TabButtons["Farm"].Indicator.Visible = true
-TabButtons["Farm"].Label.TextColor3 = Theme.Text
-TabButtons["Farm"].Btn.BackgroundTransparency = 0.4
-Pages["Farm"].Page.Visible = true
-PageTitle.Text = "Farm"
-
+-- ============================================================================
+-- [ส่วนที่ 17: ตั้งค่าแท็บเริ่มต้นเมื่อเปิดสคริปต์ (Home)]
+-- ============================================================================
+TabButtons["Home"].Indicator.Visible = true
+TabButtons["Home"].Label.TextColor3 = Theme.Text
+TabButtons["Home"].Btn.BackgroundTransparency = 0.4
+Pages["Home"].Page.Visible = true
+PageTitle.Text = "Home"
