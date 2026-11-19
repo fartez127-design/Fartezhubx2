@@ -1090,7 +1090,7 @@ end)
 -- 4. Settings Tab
 -- ============================================
 local UISettingsCard = CreateCard(SettingsTab.Left, "UI Settings", "⚙️", true)
-AddSmoothSlider(UISettingsCard, "UIScalePct", "UI Scale", 1, 100, 65, "%", function(pct)
+AddSmoothSlider(UISettingsCard, "UIScalePct", "UI Scale", 1, 100, 75, "%", function(pct)
     local targetScale = math.clamp(pct / 100, 0.01, 1)
     TweenService:Create(UIScale, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Scale = targetScale
@@ -1384,3 +1384,4 @@ TabButtons["Farm"].Label.TextColor3 = Theme.Text
 TabButtons["Farm"].Btn.BackgroundTransparency = 0.4
 Pages["Farm"].Page.Visible = true
 PageTitle.Text = "Farm"
+
